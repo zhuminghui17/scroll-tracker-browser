@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "ScrollTrackerBrowser",
+    "slug": "ScrollTrackerBrowser",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.scrolltracker.browser",
+      "infoPlist": {
+        "NSAllowsArbitraryLoads": true,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      },
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "db1c4659-7c37-464d-b182-cd07f41dec66"
+      }
+    }
+  }
+}
