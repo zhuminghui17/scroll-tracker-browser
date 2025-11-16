@@ -1,6 +1,6 @@
 // BookmarksView: Display and manage bookmarks
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,9 @@ import {
   StyleSheet,
   Modal,
   Alert,
-  Image,
 } from 'react-native';
 import { Bookmark } from '../types/browser';
+import { FaviconIcon } from '../utils/favicon';
 
 interface BookmarksViewProps {
   visible: boolean;
@@ -65,36 +65,6 @@ const BookmarksView: React.FC<BookmarksViewProps> = ({
     }
   };
 
-  // Get favicon URL for a domain
-  const getFaviconUrl = (url: string): string => {
-    try {
-      const urlObj = new URL(url);
-      const domain = urlObj.hostname;
-      // Using Google's favicon service with higher resolution
-      return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
-    } catch {
-      return '';
-    }
-  };
-
-  // Favicon component with fallback
-  const FaviconIcon: React.FC<{ url: string }> = ({ url }) => {
-    const [imageError, setImageError] = useState(false);
-    const faviconUrl = getFaviconUrl(url);
-
-    if (!faviconUrl || imageError) {
-      return <Text style={styles.bookmarkIconText}>🔖</Text>;
-    }
-
-    return (
-      <Image
-        source={{ uri: faviconUrl }}
-        style={styles.faviconImage}
-        onError={() => setImageError(true)}
-      />
-    );
-  };
-
   return (
     <Modal
       visible={visible}
@@ -135,7 +105,7 @@ const BookmarksView: React.FC<BookmarksViewProps> = ({
               >
                 {/* Bookmark Icon */}
                 <View style={styles.bookmarkIcon}>
-                  <FaviconIcon url={bookmark.url} />
+                  <FaviconIcon url={bookmark.url} size={24} fallbackEmoji="🔖" />
                 </View>
 
                 {/* Bookmark Info */}
@@ -246,11 +216,6 @@ const styles = StyleSheet.create({
   },
   bookmarkIconText: {
     fontSize: 20,
-  },
-  faviconImage: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
   },
   bookmarkInfo: {
     flex: 1,

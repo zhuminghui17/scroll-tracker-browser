@@ -10,6 +10,7 @@ import {
   Modal,
 } from 'react-native';
 import { Tab } from '../types/browser';
+import { FaviconIcon } from '../utils/favicon';
 
 interface TabListViewProps {
   visible: boolean;
@@ -97,7 +98,7 @@ const TabListView: React.FC<TabListViewProps> = ({
             >
               {/* Tab Icon */}
               <View style={styles.tabIcon}>
-                <Text style={styles.tabIconText}>🌐</Text>
+                <FaviconIcon url={tab.url} size={24} fallbackEmoji="🌐" />
               </View>
 
               {/* Tab Info */}
