@@ -4,12 +4,16 @@ import { TimeMetrics } from '../types/tracking';
 
 export class TimeTracker {
   private sessionStartTime: number = 0;
-  private activeScrollTime: number = 0; // milliseconds of active scrolling
-  private passiveViewTime: number = 0; // milliseconds of passive viewing
+  private scrollingTime: number = 0; // milliseconds spent scrolling
   
   private lastScrollTime: number = 0;
   private isScrolling: boolean = false;
   private scrollTimeoutId: any = null;
+  
+  // Pause/resume functionality
+  private isPaused: boolean = false;
+  private pauseStartTime: number = 0;
+  private totalPausedTime: number = 0; // Total time spent paused
   
   // Configuration
   private readonly SCROLL_TIMEOUT = 150; // ms - time to consider scroll as "continuous"
@@ -21,24 +25,31 @@ export class TimeTracker {
 
   // Process a scroll event
   processScrollEvent(deltaY: number, timestamp: number): void {
+    // Don't track if paused
+    if (this.isPaused) return;
+    
     const absDelta = Math.abs(deltaY);
     
     // Only track if scroll delta is significant
     if (absDelta > this.MIN_DELTA) {
+      // If we're already scrolling, add the time since last scroll
+      if (this.isScrolling && this.lastScrollTime > 0) {
+        const timeSinceLastScroll = timestamp - this.lastScrollTime;
+        
+        if (timeSinceLastScroll > 0 && timeSinceLastScroll <= this.SCROLL_TIMEOUT) {
+          // Continuous scrolling - add the time difference
+          this.scrollingTime += timeSinceLastScroll;
+          console.log(`[TimeTracker] Added ${timeSinceLastScroll}ms scrolling time`);
+        }
+      }
+      
+      // Start scrolling if not already
       if (!this.isScrolling) {
-        // Start of a new scroll burst
         this.isScrolling = true;
-        console.log('[TimeTracker] Active scrolling started');
+        console.log('[TimeTracker] Scrolling started');
       }
       
       // Update last scroll time
-      const timeSinceLastScroll = this.lastScrollTime > 0 ? timestamp - this.lastScrollTime : 0;
-      
-      if (timeSinceLastScroll > 0 && timeSinceLastScroll <= this.SCROLL_TIMEOUT) {
-        // Continuous scrolling - add the time difference to active time
-        this.activeScrollTime += timeSinceLastScroll;
-      }
-      
       this.lastScrollTime = timestamp;
       
       // Clear existing timeout
@@ -49,13 +60,16 @@ export class TimeTracker {
       // Set timeout to detect end of scrolling
       this.scrollTimeoutId = setTimeout(() => {
         this.isScrolling = false;
-        console.log('[TimeTracker] Active scrolling ended');
+        console.log('[TimeTracker] Scrolling ended');
       }, this.SCROLL_TIMEOUT);
     }
   }
 
   // Process touch events (start, move, end)
   processTouchEvent(action: 'start' | 'move' | 'end', timestamp: number): void {
+    // Don't track if paused
+    if (this.isPaused) return;
+    
     if (action === 'start') {
       if (!this.isScrolling) {
         this.isScrolling = true;
@@ -64,23 +78,55 @@ export class TimeTracker {
     } else if (action === 'end') {
       if (this.isScrolling && this.lastScrollTime > 0) {
         const scrollDuration = timestamp - this.lastScrollTime;
-        this.activeScrollTime += scrollDuration;
+        this.scrollingTime += scrollDuration;
         this.isScrolling = false;
       }
     }
   }
 
+  // Pause time tracking (when tab becomes inactive)
+  pause(): void {
+    if (this.isPaused) return;
+    
+    this.isPaused = true;
+    this.pauseStartTime = Date.now();
+    
+    // End any active scrolling
+    if (this.isScrolling) {
+      this.isScrolling = false;
+      if (this.scrollTimeoutId) {
+        clearTimeout(this.scrollTimeoutId);
+        this.scrollTimeoutId = null;
+      }
+    }
+    
+    console.log('[TimeTracker] Paused');
+  }
+
+  // Resume time tracking (when tab becomes active)
+  resume(): void {
+    if (!this.isPaused) return;
+    
+    const pauseDuration = Date.now() - this.pauseStartTime;
+    this.totalPausedTime += pauseDuration;
+    this.isPaused = false;
+    this.pauseStartTime = 0;
+    
+    console.log(`[TimeTracker] Resumed (paused for ${pauseDuration}ms)`);
+  }
+
   // Get current time metrics
   getCurrentMetrics(): TimeMetrics {
     const now = Date.now();
-    const totalTime = now - this.sessionStartTime;
+    let totalTime = now - this.sessionStartTime - this.totalPausedTime;
     
-    // Calculate passive time as total time minus active scrolling time
-    const passiveTime = Math.max(0, totalTime - this.activeScrollTime);
+    // If currently paused, subtract the current pause duration
+    if (this.isPaused && this.pauseStartTime > 0) {
+      totalTime -= (now - this.pauseStartTime);
+    }
     
     return {
-      activeScrollTime: this.activeScrollTime,
-      passiveViewTime: passiveTime,
+      scrollingTime: this.scrollingTime,
       totalTime: totalTime,
     };
   }
@@ -88,10 +134,12 @@ export class TimeTracker {
   // Reset tracking (for new session)
   reset(): void {
     this.sessionStartTime = Date.now();
-    this.activeScrollTime = 0;
-    this.passiveViewTime = 0;
+    this.scrollingTime = 0;
     this.lastScrollTime = 0;
     this.isScrolling = false;
+    this.isPaused = false;
+    this.pauseStartTime = 0;
+    this.totalPausedTime = 0;
     
     if (this.scrollTimeoutId) {
       clearTimeout(this.scrollTimeoutId);
@@ -120,12 +168,12 @@ export class TimeTracker {
   logMetrics(): void {
     const metrics = this.getCurrentMetrics();
     console.log(
-      `[TIME] Active: ${this.formatTime(metrics.activeScrollTime)}, ` +
-      `Passive: ${this.formatTime(metrics.passiveViewTime)}, ` +
+      `[TIME] Scrolling: ${this.formatTime(metrics.scrollingTime)}, ` +
       `Total: ${this.formatTime(metrics.totalTime)}`
     );
   }
 }
 
 export default TimeTracker;
+
 

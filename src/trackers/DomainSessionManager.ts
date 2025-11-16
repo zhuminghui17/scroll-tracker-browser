@@ -52,8 +52,7 @@ export class DomainSessionManager {
         screenHeights: 0,
       },
       timeMetrics: {
-        activeScrollTime: 0,
-        passiveViewTime: 0,
+        scrollingTime: 0,
         totalTime: 0,
       },
       url,
@@ -126,13 +125,34 @@ export class DomainSessionManager {
     this.currentSession.timeMetrics = this.timeTracker.getCurrentMetrics();
   }
 
+  // Pause tracking (when tab becomes inactive)
+  pause(): void {
+    this.timeTracker.pause();
+    console.log('[DomainSessionManager] Tracking paused');
+  }
+
+  // Resume tracking (when tab becomes active)
+  resume(): void {
+    this.timeTracker.resume();
+    console.log('[DomainSessionManager] Tracking resumed');
+  }
+
   // Get current session
   getCurrentSession(): DomainSession | null {
     return this.currentSession;
   }
 
-  // Get all sessions
+  // Get all sessions (including current active session if exists)
   getAllSessions(): DomainSession[] {
+    if (this.currentSession) {
+      // Update current session with latest metrics before returning
+      const updatedCurrentSession = {
+        ...this.currentSession,
+        scrollMetrics: this.scrollTracker.getCurrentMetrics(),
+        timeMetrics: this.timeTracker.getCurrentMetrics(),
+      };
+      return [...this.sessions, updatedCurrentSession];
+    }
     return this.sessions;
   }
 
@@ -176,8 +196,7 @@ export class DomainSessionManager {
         existing.scrollMetrics.screenHeights += session.scrollMetrics.screenHeights;
         
         // Aggregate time metrics
-        existing.timeMetrics.activeScrollTime += session.timeMetrics.activeScrollTime;
-        existing.timeMetrics.passiveViewTime += session.timeMetrics.passiveViewTime;
+        existing.timeMetrics.scrollingTime += session.timeMetrics.scrollingTime;
         existing.timeMetrics.totalTime += session.timeMetrics.totalTime;
         
         existing.sessionCount++;

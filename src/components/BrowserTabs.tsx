@@ -68,9 +68,11 @@ const BrowserTabs: React.FC = () => {
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentSessions, setCurrentSessions] = useState<DomainSession[]>([]);
 
   // Store refs to all tab WebViews
   const tabRefs = useRef<Map<string, BrowserViewRef>>(new Map());
+  const previousActiveTabId = useRef<string>('');
 
   // Generate unique tab ID
   const generateTabId = (): string => {
@@ -98,7 +100,17 @@ const BrowserTabs: React.FC = () => {
       canGoForward: false,
     };
 
+    // Pause the current active tab before creating a new one
+    if (previousActiveTabId.current) {
+      const prevRef = tabRefs.current.get(previousActiveTabId.current);
+      if (prevRef) {
+        prevRef.pause();
+        console.log(`[BrowserTabs] Paused previous tab: ${previousActiveTabId.current}`);
+      }
+    }
+
     setTabs((prevTabs) => [...prevTabs, newTab]);
+    previousActiveTabId.current = newTabId;
     setActiveTabId(newTabId);
 
     console.log(`[BrowserTabs] Created new tab: ${newTabId}`);
@@ -141,6 +153,23 @@ const BrowserTabs: React.FC = () => {
 
   // Switch to a tab
   const switchTab = useCallback((tabId: string) => {
+    // Pause the previous active tab
+    if (previousActiveTabId.current && previousActiveTabId.current !== tabId) {
+      const prevRef = tabRefs.current.get(previousActiveTabId.current);
+      if (prevRef) {
+        prevRef.pause();
+        console.log(`[BrowserTabs] Paused tab: ${previousActiveTabId.current}`);
+      }
+    }
+    
+    // Resume the new active tab
+    const newRef = tabRefs.current.get(tabId);
+    if (newRef) {
+      newRef.resume();
+      console.log(`[BrowserTabs] Resumed tab: ${tabId}`);
+    }
+    
+    previousActiveTabId.current = tabId;
     setActiveTabId(tabId);
     console.log(`[BrowserTabs] Switched to tab: ${tabId}`);
   }, []);
@@ -209,6 +238,7 @@ const BrowserTabs: React.FC = () => {
 
         if (savedState && savedState.tabs.length > 0) {
           setTabs(savedState.tabs);
+          previousActiveTabId.current = savedState.activeTabId;
           setActiveTabId(savedState.activeTabId);
           setHistory(savedState.history);
           // If no bookmarks saved, use default bookmarks
@@ -218,13 +248,15 @@ const BrowserTabs: React.FC = () => {
           console.log('[BrowserTabs] Restored browser state from storage');
         } else {
           // Create initial tab and set default bookmarks
-          createTab(DEFAULT_URL);
+          const newTabId = createTab(DEFAULT_URL);
+          previousActiveTabId.current = newTabId;
           setBookmarks(DEFAULT_BOOKMARKS);
           console.log('[BrowserTabs] Created initial tab with default bookmarks');
         }
       } catch (error) {
         console.error('[BrowserTabs] Error loading state:', error);
-        createTab(DEFAULT_URL);
+        const newTabId = createTab(DEFAULT_URL);
+        previousActiveTabId.current = newTabId;
         setBookmarks(DEFAULT_BOOKMARKS);
       } finally {
         setIsLoading(false);
@@ -335,7 +367,13 @@ const BrowserTabs: React.FC = () => {
     return allSessions;
   }, []);
 
+  // Refresh sessions data
+  const refreshSessions = useCallback(() => {
+    setCurrentSessions(getAllSessions());
+  }, [getAllSessions]);
+
   const handleShowStats = () => {
+    refreshSessions(); // Get initial data
     setShowStats(true);
   };
 
@@ -380,6 +418,11 @@ const BrowserTabs: React.FC = () => {
               ref={(ref) => {
                 if (ref) {
                   tabRefs.current.set(tab.id, ref);
+                  // If this tab is not the active one, pause it immediately
+                  if (tab.id !== activeTabId) {
+                    ref.pause();
+                    console.log(`[BrowserTabs] Tab ${tab.id} initialized as paused`);
+                  }
                 }
               }}
               tabId={tab.id}
@@ -424,8 +467,9 @@ const BrowserTabs: React.FC = () => {
       {/* Scroll Stats View */}
       <ScrollStatsView
         visible={showStats}
-        sessions={getAllSessions()}
+        sessions={currentSessions}
         onClose={() => setShowStats(false)}
+        onRefresh={refreshSessions}
       />
     </View>
   );

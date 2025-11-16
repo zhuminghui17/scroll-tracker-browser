@@ -1,6 +1,6 @@
 // ScrollStatsView: Display scroll statistics and analytics
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,8 +24,7 @@ interface DomainStats {
   domain: string;
   totalDistance: number; // meters
   totalTime: number; // ms
-  activeTime: number; // ms
-  passiveTime: number; // ms
+  scrollingTime: number; // ms
   sessionCount: number;
   screenHeights: number;
 }
@@ -34,35 +33,45 @@ interface ScrollStatsViewProps {
   visible: boolean;
   sessions: DomainSession[];
   onClose: () => void;
+  onRefresh?: () => void; // Callback to request fresh data
 }
 
 const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
   visible,
   sessions,
   onClose,
+  onRefresh,
 }) => {
   const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
+
+  // Auto-refresh stats every 500ms when visible
+  useEffect(() => {
+    if (!visible || !onRefresh) return;
+
+    const intervalId = setInterval(() => {
+      onRefresh();
+    }, 500);
+
+    return () => clearInterval(intervalId);
+  }, [visible, onRefresh]);
 
   // Calculate aggregated stats
   const calculateStats = () => {
     const domainStatsMap = new Map<string, DomainStats>();
     let totalDistance = 0;
     let totalTime = 0;
-    let totalActiveTime = 0;
-    let totalPassiveTime = 0;
+    let totalScrollingTime = 0;
     let totalScreenHeights = 0;
 
     sessions.forEach((session) => {
       const distance = session.scrollMetrics.distanceMeters;
       const time = session.timeMetrics.totalTime;
-      const active = session.timeMetrics.activeScrollTime;
-      const passive = session.timeMetrics.passiveViewTime;
+      const scrolling = session.timeMetrics.scrollingTime;
       const heights = session.scrollMetrics.screenHeights;
 
       totalDistance += distance;
       totalTime += time;
-      totalActiveTime += active;
-      totalPassiveTime += passive;
+      totalScrollingTime += scrolling;
       totalScreenHeights += heights;
 
       if (!domainStatsMap.has(session.domain)) {
@@ -70,8 +79,7 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
           domain: session.domain,
           totalDistance: distance,
           totalTime: time,
-          activeTime: active,
-          passiveTime: passive,
+          scrollingTime: scrolling,
           sessionCount: 1,
           screenHeights: heights,
         });
@@ -79,8 +87,7 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
         const existing = domainStatsMap.get(session.domain)!;
         existing.totalDistance += distance;
         existing.totalTime += time;
-        existing.activeTime += active;
-        existing.passiveTime += passive;
+        existing.scrollingTime += scrolling;
         existing.sessionCount += 1;
         existing.screenHeights += heights;
       }
@@ -93,11 +100,10 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
     return {
       totalDistance,
       totalTime,
-      totalActiveTime,
-      totalPassiveTime,
+      totalScrollingTime,
       totalScreenHeights,
       domainStats,
-      activeRatio: totalTime > 0 ? totalActiveTime / totalTime : 0,
+      scrollingRatio: totalTime > 0 ? totalScrollingTime / totalTime : 0,
     };
   };
 
@@ -156,7 +162,7 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
 
                   {/* Total Time */}
                   <View style={[styles.statsCard, styles.cardGreen]}>
-                    <Text style={styles.cardLabel}>Time</Text>
+                    <Text style={styles.cardLabel}>Screen Time</Text>
                     <View style={styles.cardValueContainer}>
                       <Text style={styles.cardValue}>{timeCard.value}</Text>
                       <Text style={styles.cardUnit}>{timeCard.unit}</Text>
@@ -176,12 +182,15 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
                     </View>
                   </View>
 
-                  {/* Active Ratio */}
+                  {/* Scrolling Time */}
                   <View style={[styles.statsCard, styles.cardOrange]}>
-                    <Text style={styles.cardLabel}>Active Scrolling</Text>
+                    <Text style={styles.cardLabel}>Scrolling Time</Text>
                     <View style={styles.cardValueContainer}>
                       <Text style={styles.cardValue}>
-                        {formatPercentage(stats.activeRatio)}
+                        {formatTimeForCard(stats.totalScrollingTime).value}
+                      </Text>
+                      <Text style={styles.cardUnit}>
+                        {formatTimeForCard(stats.totalScrollingTime).unit}
                       </Text>
                     </View>
                   </View>
@@ -230,15 +239,15 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
                       {isExpanded && (
                         <View style={styles.expandedDetails}>
                           <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Active Time:</Text>
+                            <Text style={styles.detailLabel}>Scrolling Time:</Text>
                             <Text style={styles.detailValue}>
-                              {formatTime(domainStat.activeTime)}
+                              {formatTime(domainStat.scrollingTime)}
                             </Text>
                           </View>
                           <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Passive Time:</Text>
+                            <Text style={styles.detailLabel}>Total Time:</Text>
                             <Text style={styles.detailValue}>
-                              {formatTime(domainStat.passiveTime)}
+                              {formatTime(domainStat.totalTime)}
                             </Text>
                           </View>
                           <View style={styles.detailRow}>

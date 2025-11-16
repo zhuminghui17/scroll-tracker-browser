@@ -36,9 +36,8 @@ export interface ScrollMetrics {
 }
 
 export interface TimeMetrics {
-  activeScrollTime: number; // milliseconds
-  passiveViewTime: number; // milliseconds
-  totalTime: number; // milliseconds
+  scrollingTime: number; // milliseconds spent scrolling (fingers moving)
+  totalTime: number; // milliseconds total time on page
 }
 
 export interface DomainSession {

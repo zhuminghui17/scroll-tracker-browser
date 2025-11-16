@@ -139,6 +139,8 @@ export interface BrowserViewRef {
   reload: () => void;
   loadUrl: (url: string) => void;
   getSessions: () => any[];
+  pause: () => void;
+  resume: () => void;
 }
 
 interface BrowserViewProps {
@@ -177,6 +179,12 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
     },
     getSessions: () => {
       return sessionManagerRef.current.getAllSessions();
+    },
+    pause: () => {
+      sessionManagerRef.current.pause();
+    },
+    resume: () => {
+      sessionManagerRef.current.resume();
     },
   }));
 
