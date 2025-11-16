@@ -1,6 +1,6 @@
 // NavigationBar: Mobile-optimized browser navigation controls
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   TextInput,
@@ -47,6 +47,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
 }) => {
   const [isEditingUrl, setIsEditingUrl] = useState(false);
   const [editedUrl, setEditedUrl] = useState(url);
+  const urlInputRef = useRef<TextInput>(null);
 
   // Update edited URL when prop changes
   React.useEffect(() => {
@@ -150,12 +151,17 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
       {/* URL Bar */}
       <View style={styles.urlBarContainer}>
         <TextInput
+          ref={urlInputRef}
           style={styles.urlInput}
           value={isEditingUrl ? editedUrl : getDisplayUrl(url)}
           onChangeText={setEditedUrl}
           onFocus={() => {
             setIsEditingUrl(true);
             setEditedUrl(url);
+            // Select all text after a brief delay to ensure it works
+            setTimeout(() => {
+              urlInputRef.current?.setSelection(0, url.length);
+            }, 10);
           }}
           onBlur={() => setIsEditingUrl(false)}
           onSubmitEditing={handleUrlSubmit}
@@ -165,8 +171,6 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           autoCorrect={false}
           placeholder="Search or enter URL"
           placeholderTextColor="#999"
-          selectTextOnFocus={true}
-          selection={isEditingUrl ? { start: 0, end: editedUrl.length } : undefined}
         />
       </View>
 
