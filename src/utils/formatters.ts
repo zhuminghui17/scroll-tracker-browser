@@ -1,15 +1,49 @@
 // Formatting utilities for stats display
 
+import { DeviceConfig } from './DeviceConfig';
+
 /**
- * Format distance in meters to human-readable string
- * @param meters Distance in meters
+ * Convert pixels to meters
+ * @param pixels Distance in device pixels/points
+ * @returns Distance in meters
+ */
+export function pixelsToMeters(pixels: number): number {
+  const deviceConfig = DeviceConfig.getInstance();
+  const ppi = deviceConfig.getPPI();
+  const inches = pixels / ppi;
+  const cm = inches * 2.54;
+  const meters = cm / 100;
+  return meters;
+}
+
+/**
+ * Convert pixels to centimeters
+ * @param pixels Distance in device pixels/points
+ * @returns Distance in centimeters
+ */
+export function pixelsToCm(pixels: number): number {
+  const deviceConfig = DeviceConfig.getInstance();
+  const ppi = deviceConfig.getPPI();
+  const inches = pixels / ppi;
+  const cm = inches * 2.54;
+  return cm;
+}
+
+/**
+ * Format distance from pixels to human-readable string
+ * @param pixels Distance in device pixels/points
  * @returns Formatted string like "1.2 km" or "450 m"
  */
-export function formatDistance(meters: number): string {
+export function formatDistance(pixels: number): string {
+  const meters = pixelsToMeters(pixels);
   if (meters >= 1000) {
-    return `${(meters / 1000).toFixed(2)} km`; // 1.11 km
+    return `${(meters / 1000).toFixed(2)} km`;
   }
-  return `${(meters).toFixed(2)} m`; // 1.11 m
+  if (meters >= 1) {
+    return `${meters.toFixed(2)} m`;
+  }
+  const cm = pixelsToCm(pixels);
+  return `${cm.toFixed(1)} cm`;
 }
 
 /**
@@ -61,19 +95,27 @@ export function formatNumber(num: number): string {
 
 /**
  * Format distance value for display in stats cards
- * @param meters Distance in meters
+ * @param pixels Distance in device pixels/points
  * @returns Object with value and unit
  */
-export function formatDistanceForCard(meters: number): { value: string; unit: string } {
+export function formatDistanceForCard(pixels: number): { value: string; unit: string } {
+  const meters = pixelsToMeters(pixels);
   if (meters >= 1000) {
     return {
       value: (meters / 1000).toFixed(2),
       unit: 'km',
     };
   }
+  if (meters >= 1) {
+    return {
+      value: meters.toFixed(2),
+      unit: 'm',
+    };
+  }
+  const cm = pixelsToCm(pixels);
   return {
-    value: (meters).toFixed(2),
-    unit: 'm',
+    value: cm.toFixed(1),
+    unit: 'cm',
   };
 }
 

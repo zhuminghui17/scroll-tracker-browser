@@ -27,11 +27,8 @@ export interface TrackingEvent {
 }
 
 export interface ScrollMetrics {
-  distanceCm: number;
-  distanceMeters: number;
-  distanceFeet: number;
-  distanceInches: number;
-  screenHeights: number;
+  distancePixels: number; // Total scroll distance in pixels (device pixels/points)
+  screenHeights: number;  // Calculated as distancePixels / deviceScreenHeight
 }
 
 export interface TimeMetrics {

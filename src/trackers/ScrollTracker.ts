@@ -23,28 +23,16 @@ export class ScrollTracker {
     return this.getCurrentMetrics();
   }
 
-  // Calculate current scroll metrics in all units
+  // Calculate current scroll metrics
   getCurrentMetrics(): ScrollMetrics {
-    const ppi = this.deviceConfig.getPPI();
     const deviceScreenHeight = this.deviceConfig.getDeviceInfo().screenHeight;
     
-    // Convert points to inches: points / PPI
-    const inches = this.totalScrollPoints / ppi;
-    
-    // Convert to other units
-    const centimeters = inches * 2.54;
-    const meters = centimeters / 100;
-    const feet = inches / 12;
-
     // Calculate screen heights: total scroll distance / device screen height
     // This includes both upward and downward scrolling
     const screenHeights = this.totalScrollPoints / deviceScreenHeight;
 
     return {
-      distanceCm: parseFloat(centimeters.toFixed(2)),
-      distanceMeters: parseFloat(meters.toFixed(3)),
-      distanceFeet: parseFloat(feet.toFixed(2)),
-      distanceInches: parseFloat(inches.toFixed(2)),
+      distancePixels: this.totalScrollPoints,
       screenHeights: parseFloat(screenHeights.toFixed(2)),
     };
   }
@@ -69,10 +57,16 @@ export class ScrollTracker {
   // Log current metrics to console
   logMetrics(domain: string): void {
     const metrics = this.getCurrentMetrics();
+    const ppi = this.deviceConfig.getPPI();
+    
+    // Convert to display units
+    const inches = metrics.distancePixels / ppi;
+    const cm = inches * 2.54;
+    const meters = cm / 100;
+    
     console.log(
       `[SCROLL] Domain: ${domain}, ` +
-      `Distance: ${metrics.distanceCm}cm (${metrics.distanceMeters}m), ` +
-      `${metrics.distanceFeet}ft (${metrics.distanceInches}in), ` +
+      `Distance: ${metrics.distancePixels}px (${cm.toFixed(2)}cm, ${meters.toFixed(3)}m), ` +
       `Screen Heights: ${metrics.screenHeights}`
     );
   }

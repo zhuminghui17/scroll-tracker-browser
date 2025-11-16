@@ -47,13 +47,13 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
 
   // Calculate aggregated stats
   const calculateStats = () => {
-    let totalDistance = 0;
+    let totalDistancePixels = 0;
     let totalTime = 0;
     let totalScrollingTime = 0;
     let totalScreenHeights = 0;
 
     stats.forEach((domainStat) => {
-      totalDistance += domainStat.scrollMetrics.distanceMeters;
+      totalDistancePixels += domainStat.scrollMetrics.distancePixels;
       totalTime += domainStat.timeMetrics.totalTime;
       totalScrollingTime += domainStat.timeMetrics.scrollingTime;
       totalScreenHeights += domainStat.scrollMetrics.screenHeights;
@@ -61,11 +61,11 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
 
     // Sort domains by distance
     const sortedDomains = [...stats].sort(
-      (a, b) => b.scrollMetrics.distanceMeters - a.scrollMetrics.distanceMeters
+      (a, b) => b.scrollMetrics.distancePixels - a.scrollMetrics.distancePixels
     );
 
     return {
-      totalDistance,
+      totalDistancePixels,
       totalTime,
       totalScrollingTime,
       totalScreenHeights,
@@ -77,11 +77,11 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
   const aggregatedStats = calculateStats();
   const hasData = stats.length > 0;
 
-  const distanceCard = formatDistanceForCard(aggregatedStats.totalDistance);
+  const distanceCard = formatDistanceForCard(aggregatedStats.totalDistancePixels);
   const timeCard = formatTimeForCard(aggregatedStats.totalTime);
 
   // Find max distance for progress bar scaling
-  const maxDistance = Math.max(...aggregatedStats.domainStats.map((d) => d.scrollMetrics.distanceMeters), 1);
+  const maxDistancePixels = Math.max(...aggregatedStats.domainStats.map((d) => d.scrollMetrics.distancePixels), 1);
 
   return (
     <Modal
@@ -169,7 +169,7 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
                 <Text style={styles.sectionTitle}>By Domain</Text>
                 {aggregatedStats.domainStats.map((domainStat) => {
                   const isExpanded = expandedDomain === domainStat.domain;
-                  const progressWidth = (domainStat.scrollMetrics.distanceMeters / maxDistance) * 100;
+                  const progressWidth = (domainStat.scrollMetrics.distancePixels / maxDistancePixels) * 100;
 
                   return (
                     <TouchableOpacity
@@ -188,7 +188,7 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
                           </Text>
                         </View>
                         <Text style={styles.domainDistance}>
-                          {formatDistance(domainStat.scrollMetrics.distanceMeters)}
+                          {formatDistance(domainStat.scrollMetrics.distancePixels)}
                         </Text>
                       </View>
 
