@@ -26,6 +26,7 @@ interface NavigationBarProps {
   onShowMenu: () => void;
   onAddBookmark: () => void;
   onShowBookmarks: () => void;
+  onShowStats: () => void;
 }
 
 const NavigationBar: React.FC<NavigationBarProps> = ({
@@ -42,6 +43,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
   onShowMenu,
   onAddBookmark,
   onShowBookmarks,
+  onShowStats,
 }) => {
   const [isEditingUrl, setIsEditingUrl] = useState(false);
   const [editedUrl, setEditedUrl] = useState(url);
@@ -98,8 +100,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           } else if (buttonIndex === 2) {
             onShowBookmarks();
           } else if (buttonIndex === 3) {
-            // View Scroll Stats - placeholder
-            Alert.alert('View Scroll Stats', 'This feature will show your scrolling statistics.');
+            onShowStats();
           } else if (buttonIndex === 4) {
             onRefresh();
           }
@@ -113,7 +114,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         [
           { text: 'Add Bookmark', onPress: onAddBookmark },
           { text: 'View Bookmarks', onPress: onShowBookmarks },
-          { text: 'View Scroll Stats', onPress: () => Alert.alert('View Scroll Stats', 'Coming soon!') },
+          { text: 'View Scroll Stats', onPress: onShowStats },
           { text: 'Refresh', onPress: onRefresh },
           { text: 'Cancel', style: 'cancel' },
         ]

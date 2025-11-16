@@ -6,7 +6,9 @@ import BrowserView, { BrowserViewRef } from './BrowserView';
 import NavigationBar from './NavigationBar';
 import TabListView from './TabListView';
 import BookmarksView from './BookmarksView';
+import ScrollStatsView from './ScrollStatsView';
 import { Tab, HistoryEntry, Bookmark } from '../types/browser';
+import { DomainSession } from '../types/tracking';
 import BrowserStorage from '../storage/BrowserStorage';
 
 const DEFAULT_URL = 'https://www.google.com';
@@ -18,6 +20,7 @@ const BrowserTabs: React.FC = () => {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [showTabGrid, setShowTabGrid] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Store refs to all tab WebViews
@@ -263,6 +266,28 @@ const BrowserTabs: React.FC = () => {
     handleNavigate(url);
   };
 
+  // Get all sessions from all tabs
+  const getAllSessions = useCallback((): DomainSession[] => {
+    const allSessions: DomainSession[] = [];
+    
+    tabRefs.current.forEach((ref) => {
+      try {
+        const sessions = ref.getSessions();
+        if (sessions && Array.isArray(sessions)) {
+          allSessions.push(...sessions);
+        }
+      } catch (error) {
+        console.error('[BrowserTabs] Error getting sessions from tab:', error);
+      }
+    });
+
+    return allSessions;
+  }, []);
+
+  const handleShowStats = () => {
+    setShowStats(true);
+  };
+
   // Get active tab data
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
 
@@ -287,6 +312,7 @@ const BrowserTabs: React.FC = () => {
         onShowMenu={handleShowMenu}
         onAddBookmark={handleAddBookmark}
         onShowBookmarks={handleShowBookmarks}
+        onShowStats={handleShowStats}
       />
 
       {/* WebView for each tab (only active one is visible) */}
@@ -342,6 +368,13 @@ const BrowserTabs: React.FC = () => {
         onClose={() => setShowBookmarks(false)}
         onSelectBookmark={handleSelectBookmark}
         onDeleteBookmark={deleteBookmark}
+      />
+
+      {/* Scroll Stats View */}
+      <ScrollStatsView
+        visible={showStats}
+        sessions={getAllSessions()}
+        onClose={() => setShowStats(false)}
       />
     </View>
   );

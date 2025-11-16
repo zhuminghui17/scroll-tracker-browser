@@ -138,6 +138,7 @@ export interface BrowserViewRef {
   goForward: () => void;
   reload: () => void;
   loadUrl: (url: string) => void;
+  getSessions: () => any[];
 }
 
 interface BrowserViewProps {
@@ -159,7 +160,7 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
   const sessionManagerRef = useRef(new DomainSessionManager());
   const currentUrlRef = useRef(initialUrl);
 
-  // Expose navigation methods to parent
+  // Expose navigation methods and session data to parent
   useImperativeHandle(ref, () => ({
     goBack: () => {
       webViewRef.current?.goBack();
@@ -173,6 +174,9 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
     loadUrl: (url: string) => {
       webViewRef.current?.injectJavaScript(`window.location.href = "${url}";`);
       currentUrlRef.current = url;
+    },
+    getSessions: () => {
+      return sessionManagerRef.current.getAllSessions();
     },
   }));
 
