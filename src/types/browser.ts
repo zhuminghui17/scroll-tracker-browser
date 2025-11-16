@@ -21,6 +21,7 @@ export interface Bookmark {
   title: string;
   domain: string;
   timestamp: number;
+  favicon?: string; // Cached favicon URL
 }
 
 export interface BrowserState {

@@ -1,9 +1,11 @@
 // BrowserView: Full-screen WebView with scroll tracking
 
-import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import DomainStatsTracker from '../trackers/DomainStatsTracker';
+import NewTabPage from './NewTabPage';
+import { Bookmark } from '../types/browser';
 
 // JavaScript code to inject into the WebView for tracking
 const INJECTED_JAVASCRIPT = `
@@ -149,33 +151,51 @@ interface BrowserViewProps {
   onUrlChange?: (url: string) => void;
   onTitleChange?: (title: string) => void;
   onNavigationStateChange?: (canGoBack: boolean, canGoForward: boolean) => void;
+  bookmarks?: Bookmark[];
 }
 
 const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function BrowserView({
   tabId,
-  initialUrl = 'https://www.google.com',
+  initialUrl = 'about:newtab',
   onUrlChange,
   onTitleChange,
   onNavigationStateChange,
+  bookmarks = [],
 }, ref) {
   const webViewRef = useRef<WebView>(null);
   const statsTrackerRef = useRef(new DomainStatsTracker());
   const currentUrlRef = useRef(initialUrl);
+  const [showNewTab, setShowNewTab] = useState(initialUrl === 'about:newtab');
 
   // Expose navigation methods and stats data to parent
   useImperativeHandle(ref, () => ({
     goBack: () => {
-      webViewRef.current?.goBack();
+      if (showNewTab) {
+        setShowNewTab(false);
+      } else {
+        webViewRef.current?.goBack();
+      }
     },
     goForward: () => {
       webViewRef.current?.goForward();
     },
     reload: () => {
-      webViewRef.current?.reload();
+      if (showNewTab) {
+        // Nothing to reload on new tab page
+      } else {
+        webViewRef.current?.reload();
+      }
     },
     loadUrl: (url: string) => {
-      webViewRef.current?.injectJavaScript(`window.location.href = "${url}";`);
-      currentUrlRef.current = url;
+      if (url === 'about:newtab') {
+        setShowNewTab(true);
+        currentUrlRef.current = url;
+        onUrlChange?.(url);
+      } else {
+        setShowNewTab(false);
+        webViewRef.current?.injectJavaScript(`window.location.href = "${url}";`);
+        currentUrlRef.current = url;
+      }
     },
     getStats: () => {
       return statsTrackerRef.current.getAllStats();
@@ -189,8 +209,10 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
   }));
 
   useEffect(() => {
-    // Initialize tracking for initial URL
-    statsTrackerRef.current.switchDomain(initialUrl);
+    // Initialize tracking for initial URL (skip for new tab page)
+    if (initialUrl !== 'about:newtab') {
+      statsTrackerRef.current.switchDomain(initialUrl);
+    }
 
     // Cleanup on unmount
     return () => {
@@ -198,6 +220,21 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
       console.log(`[BrowserView] Tab ${tabId} unmounted, tracking paused`);
     };
   }, [initialUrl, tabId]);
+
+  // Handle navigation from new tab page
+  const handleNewTabNavigate = (url: string) => {
+    setShowNewTab(false);
+    currentUrlRef.current = url;
+    onUrlChange?.(url);
+    
+    // Load URL in WebView
+    if (webViewRef.current) {
+      webViewRef.current.injectJavaScript(`window.location.href = "${url}";`);
+    }
+    
+    // Start tracking
+    statsTrackerRef.current.switchDomain(url);
+  };
 
   // Handle messages from WebView
   const handleMessage = (event: WebViewMessageEvent) => {
@@ -248,8 +285,9 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
 
   // Handle navigation state changes
   const handleNavigationStateChange = (navState: any) => {
-    if (navState.url && navState.url !== currentUrlRef.current) {
+    if (navState.url && navState.url !== currentUrlRef.current && navState.url !== 'about:blank') {
       currentUrlRef.current = navState.url;
+      setShowNewTab(false);
       statsTrackerRef.current.switchDomain(navState.url);
       onUrlChange?.(navState.url);
     }
@@ -261,7 +299,7 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
 
     // Notify parent of navigation state
     if (onNavigationStateChange) {
-      onNavigationStateChange(navState.canGoBack, navState.canGoForward);
+      onNavigationStateChange(navState.canGoBack || showNewTab, navState.canGoForward);
     }
   };
 
@@ -272,32 +310,42 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
     }
   };
 
+  // Pass bookmarks directly to new tab (favicons will be loaded dynamically)
+  const newTabBookmarks = bookmarks;
+
   return (
     <View style={styles.container}>
-      <WebView
-        ref={webViewRef}
-        source={{ uri: initialUrl }}
-        style={styles.webview}
-        injectedJavaScript={INJECTED_JAVASCRIPT}
-        onMessage={handleMessage}
-        onNavigationStateChange={handleNavigationStateChange}
-        onLoadProgress={handleLoadProgress}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        startInLoadingState={true}
-        scalesPageToFit={true}
-        allowsBackForwardNavigationGestures={true}
-        // Cache and persistence props
-        cacheEnabled={true}
-        cacheMode="LOAD_CACHE_ELSE_NETWORK"
-        sharedCookiesEnabled={true}
-        thirdPartyCookiesEnabled={true}
-        // iOS specific props
-        allowsInlineMediaPlayback={true}
-        mediaPlaybackRequiresUserAction={false}
-        // Re-inject on every page load
-        injectedJavaScriptBeforeContentLoaded={INJECTED_JAVASCRIPT}
-      />
+      {showNewTab ? (
+        <NewTabPage 
+          onNavigate={handleNewTabNavigate}
+          bookmarks={newTabBookmarks}
+        />
+      ) : (
+        <WebView
+          ref={webViewRef}
+          source={{ uri: initialUrl === 'about:newtab' ? 'about:blank' : initialUrl }}
+          style={styles.webview}
+          injectedJavaScript={INJECTED_JAVASCRIPT}
+          onMessage={handleMessage}
+          onNavigationStateChange={handleNavigationStateChange}
+          onLoadProgress={handleLoadProgress}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          startInLoadingState={true}
+          scalesPageToFit={true}
+          allowsBackForwardNavigationGestures={true}
+          // Cache and persistence props
+          cacheEnabled={true}
+          cacheMode="LOAD_CACHE_ELSE_NETWORK"
+          sharedCookiesEnabled={true}
+          thirdPartyCookiesEnabled={true}
+          // iOS specific props
+          allowsInlineMediaPlayback={true}
+          mediaPlaybackRequiresUserAction={false}
+          // Re-inject on every page load
+          injectedJavaScriptBeforeContentLoaded={INJECTED_JAVASCRIPT}
+        />
+      )}
     </View>
   );
 });

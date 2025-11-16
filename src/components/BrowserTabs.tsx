@@ -10,54 +10,9 @@ import ScrollStatsView from './ScrollStatsView';
 import { Tab, HistoryEntry, Bookmark } from '../types/browser';
 import { DomainStats } from '../types/tracking';
 import BrowserStorage from '../storage/BrowserStorage';
+import { DEFAULT_BOOKMARKS } from '../constants/bookmarks';
 
-const DEFAULT_URL = 'https://www.google.com';
-
-// Default bookmarks for new users
-const DEFAULT_BOOKMARKS: Bookmark[] = [
-  {
-    id: 'default_youtube',
-    url: 'https://www.youtube.com',
-    title: 'YouTube',
-    domain: 'youtube.com',
-    timestamp: Date.now(),
-  },
-  {
-    id: 'default_webtoons',
-    url: 'https://www.webtoons.com',
-    title: 'Webtoons',
-    domain: 'webtoons.com',
-    timestamp: Date.now(),
-  },
-  {
-    id: 'default_instagram',
-    url: 'https://www.instagram.com',
-    title: 'Instagram',
-    domain: 'instagram.com',
-    timestamp: Date.now(),
-  },
-  {
-    id: 'default_pinterest',
-    url: 'https://www.pinterest.com',
-    title: 'Pinterest',
-    domain: 'pinterest.com',
-    timestamp: Date.now(),
-  },
-  {
-    id: 'default_amazon',
-    url: 'https://www.amazon.com',
-    title: 'Amazon',
-    domain: 'amazon.com',
-    timestamp: Date.now(),
-  },
-  {
-    id: 'default_canvas',
-    url: 'https://canvas.instructure.com',
-    title: 'Canvas',
-    domain: 'canvas.instructure.com',
-    timestamp: Date.now(),
-  },
-];
+const DEFAULT_URL = 'about:newtab';
 
 const BrowserTabs: React.FC = () => {
   const [tabs, setTabs] = useState<Tab[]>([]);
@@ -443,6 +398,7 @@ const BrowserTabs: React.FC = () => {
               }}
               tabId={tab.id}
               initialUrl={tab.url}
+              bookmarks={bookmarks}
               onUrlChange={(url) => {
                 updateTab(tab.id, { url });
                 if (tab.id === activeTabId) {
