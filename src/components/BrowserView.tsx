@@ -1,6 +1,6 @@
 // BrowserView: Full-screen WebView with scroll tracking
 
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import DomainSessionManager from '../trackers/DomainSessionManager';
@@ -133,13 +133,48 @@ const INJECTED_JAVASCRIPT = `
 true; // Return true to indicate script executed successfully
 `;
 
-interface BrowserViewProps {
-  initialUrl?: string;
+export interface BrowserViewRef {
+  goBack: () => void;
+  goForward: () => void;
+  reload: () => void;
+  loadUrl: (url: string) => void;
 }
 
-const BrowserView: React.FC<BrowserViewProps> = ({ initialUrl = 'https://www.google.com' }) => {
+interface BrowserViewProps {
+  tabId: string;
+  initialUrl?: string;
+  onUrlChange?: (url: string) => void;
+  onTitleChange?: (title: string) => void;
+  onNavigationStateChange?: (canGoBack: boolean, canGoForward: boolean) => void;
+}
+
+const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function BrowserView({
+  tabId,
+  initialUrl = 'https://www.google.com',
+  onUrlChange,
+  onTitleChange,
+  onNavigationStateChange,
+}, ref) {
   const webViewRef = useRef<WebView>(null);
   const sessionManagerRef = useRef(new DomainSessionManager());
+  const currentUrlRef = useRef(initialUrl);
+
+  // Expose navigation methods to parent
+  useImperativeHandle(ref, () => ({
+    goBack: () => {
+      webViewRef.current?.goBack();
+    },
+    goForward: () => {
+      webViewRef.current?.goForward();
+    },
+    reload: () => {
+      webViewRef.current?.reload();
+    },
+    loadUrl: (url: string) => {
+      webViewRef.current?.injectJavaScript(`window.location.href = "${url}";`);
+      currentUrlRef.current = url;
+    },
+  }));
 
   useEffect(() => {
     // Initialize session on mount
@@ -148,9 +183,9 @@ const BrowserView: React.FC<BrowserViewProps> = ({ initialUrl = 'https://www.goo
     // Cleanup on unmount
     return () => {
       sessionManagerRef.current.endCurrentSession();
-      console.log('[BrowserView] Component unmounted, session ended');
+      console.log(`[BrowserView] Tab ${tabId} unmounted, session ended`);
     };
-  }, [initialUrl]);
+  }, [initialUrl, tabId]);
 
   // Handle messages from WebView
   const handleMessage = (event: WebViewMessageEvent) => {
@@ -201,8 +236,20 @@ const BrowserView: React.FC<BrowserViewProps> = ({ initialUrl = 'https://www.goo
 
   // Handle navigation state changes
   const handleNavigationStateChange = (navState: any) => {
-    if (navState.url) {
+    if (navState.url && navState.url !== currentUrlRef.current) {
+      currentUrlRef.current = navState.url;
       sessionManagerRef.current.handleUrlChange(navState.url);
+      onUrlChange?.(navState.url);
+    }
+
+    // Update title if available
+    if (navState.title) {
+      onTitleChange?.(navState.title);
+    }
+
+    // Notify parent of navigation state
+    if (onNavigationStateChange) {
+      onNavigationStateChange(navState.canGoBack, navState.canGoForward);
     }
   };
 
@@ -228,6 +275,11 @@ const BrowserView: React.FC<BrowserViewProps> = ({ initialUrl = 'https://www.goo
         startInLoadingState={true}
         scalesPageToFit={true}
         allowsBackForwardNavigationGestures={true}
+        // Cache and persistence props
+        cacheEnabled={true}
+        cacheMode="LOAD_CACHE_ELSE_NETWORK"
+        sharedCookiesEnabled={true}
+        thirdPartyCookiesEnabled={true}
         // iOS specific props
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={false}
@@ -236,7 +288,7 @@ const BrowserView: React.FC<BrowserViewProps> = ({ initialUrl = 'https://www.goo
       />
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {

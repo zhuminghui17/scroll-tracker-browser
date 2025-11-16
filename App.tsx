@@ -1,12 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, SafeAreaView } from 'react-native';
-import BrowserView from './src/components/BrowserView';
+import { StyleSheet, SafeAreaView } from 'react-native';
+import BrowserTabs from './src/components/BrowserTabs';
 
 export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      <BrowserView initialUrl="https://www.google.com" />
+      <BrowserTabs />
     </SafeAreaView>
   );
 }
