@@ -165,6 +165,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           placeholder="Search or enter URL"
           placeholderTextColor="#999"
           selectTextOnFocus={true}
+          selection={isEditingUrl ? { start: 0, end: editedUrl.length } : undefined}
         />
       </View>
 
