@@ -26,7 +26,12 @@ export class TimeTracker {
   // Process a scroll event
   processScrollEvent(deltaY: number, timestamp: number): void {
     // Don't track if paused
-    if (this.isPaused) return;
+    if (this.isPaused) {
+      if (Math.random() < 0.05) {
+        console.log('[TimeTracker] Scroll event ignored - tracker is paused');
+      }
+      return;
+    }
     
     const absDelta = Math.abs(deltaY);
     
@@ -86,13 +91,19 @@ export class TimeTracker {
     this.isPaused = true;
     this.pauseStartTime = Date.now();
     
-    // End any active scrolling
-    if (this.isScrolling) {
+    // End any active scrolling and save the time
+    if (this.isScrolling && this.scrollSessionStartTime > 0) {
+      const scrollDuration = Date.now() - this.scrollSessionStartTime;
+      this.scrollingTime += scrollDuration;
+      console.log(`[TimeTracker] Paused during scroll, saved ${scrollDuration}ms (total: ${this.scrollingTime}ms)`);
       this.isScrolling = false;
-      if (this.scrollTimeoutId) {
-        clearTimeout(this.scrollTimeoutId);
-        this.scrollTimeoutId = null;
-      }
+      this.scrollSessionStartTime = 0;
+    }
+    
+    // Clear timeout
+    if (this.scrollTimeoutId) {
+      clearTimeout(this.scrollTimeoutId);
+      this.scrollTimeoutId = null;
     }
     
     console.log('[TimeTracker] Paused');
@@ -120,10 +131,17 @@ export class TimeTracker {
       totalTime -= (now - this.pauseStartTime);
     }
     
-    return {
+    const metrics = {
       scrollingTime: this.scrollingTime,
       totalTime: totalTime,
     };
+    
+    // Debug logging every ~10 seconds
+    if (Math.random() < 0.01) {
+      console.log(`[TimeTracker] Current metrics - Total: ${(totalTime / 1000).toFixed(1)}s, Scrolling: ${(this.scrollingTime / 1000).toFixed(1)}s, Paused: ${this.isPaused}`);
+    }
+    
+    return metrics;
   }
 
   // Reset tracking (for new session)

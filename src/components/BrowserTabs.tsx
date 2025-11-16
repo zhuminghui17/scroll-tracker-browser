@@ -348,6 +348,16 @@ const BrowserTabs: React.FC = () => {
     setShowStats(true);
   };
 
+  const handleCloseStats = () => {
+    setShowStats(false);
+    // Make sure active tab resumes tracking
+    const activeRef = tabRefs.current.get(activeTabId);
+    if (activeRef) {
+      activeRef.resume();
+      console.log('[BrowserTabs] Resumed active tab after closing stats');
+    }
+  };
+
   // Get active tab data
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
 
@@ -390,9 +400,13 @@ const BrowserTabs: React.FC = () => {
                 if (ref) {
                   tabRefs.current.set(tab.id, ref);
                   // If this tab is not the active one, pause it immediately
+                  // If it IS the active one, explicitly resume it
                   if (tab.id !== activeTabId) {
                     ref.pause();
                     console.log(`[BrowserTabs] Tab ${tab.id} initialized as paused`);
+                  } else {
+                    ref.resume();
+                    console.log(`[BrowserTabs] Tab ${tab.id} initialized as active (resumed)`);
                   }
                 }
               }}
@@ -440,7 +454,7 @@ const BrowserTabs: React.FC = () => {
       <ScrollStatsView
         visible={showStats}
         stats={currentStats}
-        onClose={() => setShowStats(false)}
+        onClose={handleCloseStats}
         onRefresh={refreshStats}
       />
     </View>

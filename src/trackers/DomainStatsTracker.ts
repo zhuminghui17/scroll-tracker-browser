@@ -67,10 +67,18 @@ export class DomainStatsTracker {
 
   // Process scroll event for current domain
   processScrollEvent(scrollY: number, deltaY: number, viewportHeight: number, timestamp: number): void {
-    if (!this.currentDomain) return;
+    if (!this.currentDomain) {
+      if (Math.random() < 0.1) {
+        console.log('[DomainStatsTracker] Scroll event ignored - no current domain set');
+      }
+      return;
+    }
 
     const tracker = this.domainStats.get(this.currentDomain);
-    if (!tracker) return;
+    if (!tracker) {
+      console.log('[DomainStatsTracker] Scroll event ignored - tracker not found for domain:', this.currentDomain);
+      return;
+    }
 
     tracker.scrollTracker.processScrollEvent(scrollY, deltaY, viewportHeight);
     tracker.timeTracker.processScrollEvent(deltaY, timestamp);
