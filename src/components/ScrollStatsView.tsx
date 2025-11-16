@@ -17,6 +17,7 @@ import {
   formatNumber,
   formatDistanceForCard,
   formatTimeForCard,
+  pixelsToScreenHeights,
 } from '../utils/formatters';
 
 interface ScrollStatsViewProps {
@@ -50,19 +51,20 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
     let totalDistancePixels = 0;
     let totalTime = 0;
     let totalScrollingTime = 0;
-    let totalScreenHeights = 0;
 
     stats.forEach((domainStat) => {
       totalDistancePixels += domainStat.scrollMetrics.distancePixels;
       totalTime += domainStat.timeMetrics.totalTime;
       totalScrollingTime += domainStat.timeMetrics.scrollingTime;
-      totalScreenHeights += domainStat.scrollMetrics.screenHeights;
     });
 
     // Sort domains by distance
     const sortedDomains = [...stats].sort(
       (a, b) => b.scrollMetrics.distancePixels - a.scrollMetrics.distancePixels
     );
+
+    // Calculate total screen heights from total distance pixels
+    const totalScreenHeights = pixelsToScreenHeights(totalDistancePixels);
 
     return {
       totalDistancePixels,
@@ -220,7 +222,7 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
                           <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Screen Heights:</Text>
                             <Text style={styles.detailValue}>
-                              {formatNumber(domainStat.scrollMetrics.screenHeights)}
+                              {formatNumber(pixelsToScreenHeights(domainStat.scrollMetrics.distancePixels))}
                             </Text>
                           </View>
                         </View>

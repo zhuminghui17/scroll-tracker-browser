@@ -25,15 +25,8 @@ export class ScrollTracker {
 
   // Calculate current scroll metrics
   getCurrentMetrics(): ScrollMetrics {
-    const deviceScreenHeight = this.deviceConfig.getDeviceInfo().screenHeight;
-    
-    // Calculate screen heights: total scroll distance / device screen height
-    // This includes both upward and downward scrolling
-    const screenHeights = this.totalScrollPoints / deviceScreenHeight;
-
     return {
       distancePixels: this.totalScrollPoints,
-      screenHeights: parseFloat(screenHeights.toFixed(2)),
     };
   }
 
@@ -58,16 +51,18 @@ export class ScrollTracker {
   logMetrics(domain: string): void {
     const metrics = this.getCurrentMetrics();
     const ppi = this.deviceConfig.getPPI();
+    const deviceScreenHeight = this.deviceConfig.getDeviceInfo().screenHeight;
     
     // Convert to display units
     const inches = metrics.distancePixels / ppi;
     const cm = inches * 2.54;
     const meters = cm / 100;
+    const screenHeights = metrics.distancePixels / deviceScreenHeight;
     
     console.log(
       `[SCROLL] Domain: ${domain}, ` +
       `Distance: ${metrics.distancePixels}px (${cm.toFixed(2)}cm, ${meters.toFixed(3)}m), ` +
-      `Screen Heights: ${metrics.screenHeights}`
+      `Screen Heights: ${screenHeights.toFixed(2)}`
     );
   }
 }

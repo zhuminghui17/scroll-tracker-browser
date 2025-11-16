@@ -30,6 +30,17 @@ export function pixelsToCm(pixels: number): number {
 }
 
 /**
+ * Convert pixels to screen heights
+ * @param pixels Distance in device pixels/points
+ * @returns Number of screen heights
+ */
+export function pixelsToScreenHeights(pixels: number): number {
+  const deviceConfig = DeviceConfig.getInstance();
+  const deviceScreenHeight = deviceConfig.getDeviceInfo().screenHeight;
+  return pixels / deviceScreenHeight;
+}
+
+/**
  * Format distance from pixels to human-readable string
  * @param pixels Distance in device pixels/points
  * @returns Formatted string like "1.2 km" or "450 m"
