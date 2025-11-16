@@ -7,10 +7,12 @@ import NavigationBar from './NavigationBar';
 import TabListView from './TabListView';
 import BookmarksView from './BookmarksView';
 import ScrollStatsView from './ScrollStatsView';
+import DeviceSelectionView from './DeviceSelectionView';
 import { Tab, HistoryEntry, Bookmark } from '../types/browser';
 import { DomainStats } from '../types/tracking';
 import BrowserStorage from '../storage/BrowserStorage';
 import { DEFAULT_BOOKMARKS } from '../constants/bookmarks';
+import { DeviceConfig } from '../utils/DeviceConfig';
 
 const DEFAULT_URL = 'about:newtab';
 
@@ -22,8 +24,10 @@ const BrowserTabs: React.FC = () => {
   const [showTabGrid, setShowTabGrid] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showDeviceSelection, setShowDeviceSelection] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentStats, setCurrentStats] = useState<DomainStats[]>([]);
+  const [currentDevice, setCurrentDevice] = useState<string>('Default iPhone');
 
   // Store refs to all tab WebViews
   const tabRefs = useRef<Map<string, BrowserViewRef>>(new Map());
@@ -358,6 +362,30 @@ const BrowserTabs: React.FC = () => {
     }
   };
 
+  const handleShowDeviceSelection = () => {
+    setShowDeviceSelection(true);
+  };
+
+  const handleSelectDevice = useCallback((deviceModel: string) => {
+    const deviceConfig = DeviceConfig.getInstance();
+    deviceConfig.setDevice(deviceModel);
+    setCurrentDevice(deviceModel);
+    Alert.alert('Device Updated', `Device set to ${deviceModel}`);
+    console.log('[BrowserTabs] Device changed to:', deviceModel);
+  }, []);
+
+  // Initialize device config
+  useEffect(() => {
+    const initDevice = async () => {
+      const deviceConfig = DeviceConfig.getInstance();
+      await deviceConfig.autoDetectDevice();
+      const deviceInfo = deviceConfig.getDeviceInfo();
+      setCurrentDevice(deviceInfo.model);
+      console.log('[BrowserTabs] Device initialized:', deviceInfo.model);
+    };
+    initDevice();
+  }, []);
+
   // Get active tab data
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
 
@@ -383,6 +411,7 @@ const BrowserTabs: React.FC = () => {
         onAddBookmark={handleAddBookmark}
         onShowBookmarks={handleShowBookmarks}
         onShowStats={handleShowStats}
+        onShowDeviceSelection={handleShowDeviceSelection}
       />
 
       {/* WebView for each tab (only active one is visible) */}
@@ -456,6 +485,14 @@ const BrowserTabs: React.FC = () => {
         stats={currentStats}
         onClose={handleCloseStats}
         onRefresh={refreshStats}
+      />
+
+      {/* Device Selection View */}
+      <DeviceSelectionView
+        visible={showDeviceSelection}
+        currentDevice={currentDevice}
+        onClose={() => setShowDeviceSelection(false)}
+        onSelectDevice={handleSelectDevice}
       />
     </View>
   );

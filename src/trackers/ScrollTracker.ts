@@ -17,9 +17,10 @@ export class ScrollTracker {
   processScrollEvent(scrollY: number, deltaY: number, viewportHeight: number): ScrollMetrics {
     // Track absolute scroll delta (always positive for distance measurement)
     const absDeltaY = Math.abs(deltaY);
-    
     this.totalScrollPoints += absDeltaY;
-    this.totalScreenHeights += absDeltaY / viewportHeight;
+    const deviceScreenHeight = this.deviceConfig.getDeviceInfo().screenHeight;
+    this.totalScreenHeights += absDeltaY / deviceScreenHeight;
+    
     this.lastScrollY = scrollY;
 
     return this.getCurrentMetrics();
