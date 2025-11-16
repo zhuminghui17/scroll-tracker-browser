@@ -321,11 +321,7 @@ const BrowserTabs: React.FC = () => {
             if (statsMap.has(domainStat.domain)) {
               const existing = statsMap.get(domainStat.domain)!;
               // Add up the metrics
-              existing.scrollMetrics.distanceCm += domainStat.scrollMetrics.distanceCm;
-              existing.scrollMetrics.distanceMeters += domainStat.scrollMetrics.distanceMeters;
-              existing.scrollMetrics.distanceFeet += domainStat.scrollMetrics.distanceFeet;
-              existing.scrollMetrics.distanceInches += domainStat.scrollMetrics.distanceInches;
-              existing.scrollMetrics.screenHeights += domainStat.scrollMetrics.screenHeights;
+              existing.scrollMetrics.distancePixels += domainStat.scrollMetrics.distancePixels;
               existing.timeMetrics.scrollingTime += domainStat.timeMetrics.scrollingTime;
               existing.timeMetrics.totalTime += domainStat.timeMetrics.totalTime;
               existing.lastVisited = Math.max(existing.lastVisited, domainStat.lastVisited);
