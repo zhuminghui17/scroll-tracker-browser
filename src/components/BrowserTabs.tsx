@@ -57,13 +57,6 @@ const DEFAULT_BOOKMARKS: Bookmark[] = [
     domain: 'canvas.instructure.com',
     timestamp: Date.now(),
   },
-  {
-    id: 'default_gmail',
-    url: 'https://mail.google.com',
-    title: 'Gmail',
-    domain: 'mail.google.com',
-    timestamp: Date.now(),
-  },
 ];
 
 const BrowserTabs: React.FC = () => {

@@ -1,6 +1,6 @@
 // BookmarksView: Display and manage bookmarks
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -70,11 +70,29 @@ const BookmarksView: React.FC<BookmarksViewProps> = ({
     try {
       const urlObj = new URL(url);
       const domain = urlObj.hostname;
-      // Using Google's favicon service
-      return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+      // Using Google's favicon service with higher resolution
+      return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
     } catch {
-      return `https://www.google.com/s2/favicons?domain=google.com&sz=64`;
+      return '';
     }
+  };
+
+  // Favicon component with fallback
+  const FaviconIcon: React.FC<{ url: string }> = ({ url }) => {
+    const [imageError, setImageError] = useState(false);
+    const faviconUrl = getFaviconUrl(url);
+
+    if (!faviconUrl || imageError) {
+      return <Text style={styles.bookmarkIconText}>🔖</Text>;
+    }
+
+    return (
+      <Image
+        source={{ uri: faviconUrl }}
+        style={styles.faviconImage}
+        onError={() => setImageError(true)}
+      />
+    );
   };
 
   return (
@@ -115,13 +133,9 @@ const BookmarksView: React.FC<BookmarksViewProps> = ({
                 onPress={() => handleSelectBookmark(bookmark.url)}
                 activeOpacity={0.7}
               >
-                {/* Favicon */}
+                {/* Bookmark Icon */}
                 <View style={styles.bookmarkIcon}>
-                  <Image
-                    source={{ uri: getFaviconUrl(bookmark.url) }}
-                    style={styles.faviconImage}
-                    defaultSource={require('../../assets/icon.png')}
-                  />
+                  <FaviconIcon url={bookmark.url} />
                 </View>
 
                 {/* Bookmark Info */}
@@ -229,11 +243,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    overflow: 'hidden',
+  },
+  bookmarkIconText: {
+    fontSize: 20,
   },
   faviconImage: {
     width: 24,
     height: 24,
+    borderRadius: 4,
   },
   bookmarkInfo: {
     flex: 1,
