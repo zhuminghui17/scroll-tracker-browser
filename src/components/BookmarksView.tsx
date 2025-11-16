@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Modal,
   Alert,
+  Image,
 } from 'react-native';
 import { Bookmark } from '../types/browser';
 
@@ -64,6 +65,18 @@ const BookmarksView: React.FC<BookmarksViewProps> = ({
     }
   };
 
+  // Get favicon URL for a domain
+  const getFaviconUrl = (url: string): string => {
+    try {
+      const urlObj = new URL(url);
+      const domain = urlObj.hostname;
+      // Using Google's favicon service
+      return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+    } catch {
+      return `https://www.google.com/s2/favicons?domain=google.com&sz=64`;
+    }
+  };
+
   return (
     <Modal
       visible={visible}
@@ -102,9 +115,13 @@ const BookmarksView: React.FC<BookmarksViewProps> = ({
                 onPress={() => handleSelectBookmark(bookmark.url)}
                 activeOpacity={0.7}
               >
-                {/* Bookmark Icon */}
+                {/* Favicon */}
                 <View style={styles.bookmarkIcon}>
-                  <Text style={styles.bookmarkIconText}>🔖</Text>
+                  <Image
+                    source={{ uri: getFaviconUrl(bookmark.url) }}
+                    style={styles.faviconImage}
+                    defaultSource={require('../../assets/icon.png')}
+                  />
                 </View>
 
                 {/* Bookmark Info */}
@@ -208,13 +225,15 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: '#FFF3E0',
+    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    overflow: 'hidden',
   },
-  bookmarkIconText: {
-    fontSize: 20,
+  faviconImage: {
+    width: 24,
+    height: 24,
   },
   bookmarkInfo: {
     flex: 1,

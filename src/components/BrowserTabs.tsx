@@ -13,6 +13,59 @@ import BrowserStorage from '../storage/BrowserStorage';
 
 const DEFAULT_URL = 'https://www.google.com';
 
+// Default bookmarks for new users
+const DEFAULT_BOOKMARKS: Bookmark[] = [
+  {
+    id: 'default_youtube',
+    url: 'https://www.youtube.com',
+    title: 'YouTube',
+    domain: 'youtube.com',
+    timestamp: Date.now(),
+  },
+  {
+    id: 'default_webtoons',
+    url: 'https://www.webtoons.com',
+    title: 'Webtoons',
+    domain: 'webtoons.com',
+    timestamp: Date.now(),
+  },
+  {
+    id: 'default_instagram',
+    url: 'https://www.instagram.com',
+    title: 'Instagram',
+    domain: 'instagram.com',
+    timestamp: Date.now(),
+  },
+  {
+    id: 'default_pinterest',
+    url: 'https://www.pinterest.com',
+    title: 'Pinterest',
+    domain: 'pinterest.com',
+    timestamp: Date.now(),
+  },
+  {
+    id: 'default_amazon',
+    url: 'https://www.amazon.com',
+    title: 'Amazon',
+    domain: 'amazon.com',
+    timestamp: Date.now(),
+  },
+  {
+    id: 'default_canvas',
+    url: 'https://canvas.instructure.com',
+    title: 'Canvas',
+    domain: 'canvas.instructure.com',
+    timestamp: Date.now(),
+  },
+  {
+    id: 'default_gmail',
+    url: 'https://mail.google.com',
+    title: 'Gmail',
+    domain: 'mail.google.com',
+    timestamp: Date.now(),
+  },
+];
+
 const BrowserTabs: React.FC = () => {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>('');
@@ -165,16 +218,21 @@ const BrowserTabs: React.FC = () => {
           setTabs(savedState.tabs);
           setActiveTabId(savedState.activeTabId);
           setHistory(savedState.history);
-          setBookmarks(savedState.bookmarks || []);
+          // If no bookmarks saved, use default bookmarks
+          setBookmarks(savedState.bookmarks && savedState.bookmarks.length > 0 
+            ? savedState.bookmarks 
+            : DEFAULT_BOOKMARKS);
           console.log('[BrowserTabs] Restored browser state from storage');
         } else {
-          // Create initial tab
+          // Create initial tab and set default bookmarks
           createTab(DEFAULT_URL);
-          console.log('[BrowserTabs] Created initial tab');
+          setBookmarks(DEFAULT_BOOKMARKS);
+          console.log('[BrowserTabs] Created initial tab with default bookmarks');
         }
       } catch (error) {
         console.error('[BrowserTabs] Error loading state:', error);
         createTab(DEFAULT_URL);
+        setBookmarks(DEFAULT_BOOKMARKS);
       } finally {
         setIsLoading(false);
       }
