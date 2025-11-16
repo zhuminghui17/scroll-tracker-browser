@@ -10,35 +10,25 @@ import {
   Modal,
   Dimensions,
 } from 'react-native';
-import { DomainSession } from '../types/tracking';
+import { DomainStats } from '../types/tracking';
 import {
   formatDistance,
   formatTime,
-  formatPercentage,
   formatNumber,
   formatDistanceForCard,
   formatTimeForCard,
 } from '../utils/formatters';
 
-interface DomainStats {
-  domain: string;
-  totalDistance: number; // meters
-  totalTime: number; // ms
-  scrollingTime: number; // ms
-  sessionCount: number;
-  screenHeights: number;
-}
-
 interface ScrollStatsViewProps {
   visible: boolean;
-  sessions: DomainSession[];
+  stats: DomainStats[];
   onClose: () => void;
   onRefresh?: () => void; // Callback to request fresh data
 }
 
 const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
   visible,
-  sessions,
+  stats,
   onClose,
   onRefresh,
 }) => {
@@ -57,44 +47,21 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
 
   // Calculate aggregated stats
   const calculateStats = () => {
-    const domainStatsMap = new Map<string, DomainStats>();
     let totalDistance = 0;
     let totalTime = 0;
     let totalScrollingTime = 0;
     let totalScreenHeights = 0;
 
-    sessions.forEach((session) => {
-      const distance = session.scrollMetrics.distanceMeters;
-      const time = session.timeMetrics.totalTime;
-      const scrolling = session.timeMetrics.scrollingTime;
-      const heights = session.scrollMetrics.screenHeights;
-
-      totalDistance += distance;
-      totalTime += time;
-      totalScrollingTime += scrolling;
-      totalScreenHeights += heights;
-
-      if (!domainStatsMap.has(session.domain)) {
-        domainStatsMap.set(session.domain, {
-          domain: session.domain,
-          totalDistance: distance,
-          totalTime: time,
-          scrollingTime: scrolling,
-          sessionCount: 1,
-          screenHeights: heights,
-        });
-      } else {
-        const existing = domainStatsMap.get(session.domain)!;
-        existing.totalDistance += distance;
-        existing.totalTime += time;
-        existing.scrollingTime += scrolling;
-        existing.sessionCount += 1;
-        existing.screenHeights += heights;
-      }
+    stats.forEach((domainStat) => {
+      totalDistance += domainStat.scrollMetrics.distanceMeters;
+      totalTime += domainStat.timeMetrics.totalTime;
+      totalScrollingTime += domainStat.timeMetrics.scrollingTime;
+      totalScreenHeights += domainStat.scrollMetrics.screenHeights;
     });
 
-    const domainStats = Array.from(domainStatsMap.values()).sort(
-      (a, b) => b.totalDistance - a.totalDistance
+    // Sort domains by distance
+    const sortedDomains = [...stats].sort(
+      (a, b) => b.scrollMetrics.distanceMeters - a.scrollMetrics.distanceMeters
     );
 
     return {
@@ -102,19 +69,19 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
       totalTime,
       totalScrollingTime,
       totalScreenHeights,
-      domainStats,
+      domainStats: sortedDomains,
       scrollingRatio: totalTime > 0 ? totalScrollingTime / totalTime : 0,
     };
   };
 
-  const stats = calculateStats();
-  const hasData = sessions.length > 0;
+  const aggregatedStats = calculateStats();
+  const hasData = stats.length > 0;
 
-  const distanceCard = formatDistanceForCard(stats.totalDistance);
-  const timeCard = formatTimeForCard(stats.totalTime);
+  const distanceCard = formatDistanceForCard(aggregatedStats.totalDistance);
+  const timeCard = formatTimeForCard(aggregatedStats.totalTime);
 
   // Find max distance for progress bar scaling
-  const maxDistance = Math.max(...stats.domainStats.map((d) => d.totalDistance), 1);
+  const maxDistance = Math.max(...aggregatedStats.domainStats.map((d) => d.scrollMetrics.distanceMeters), 1);
 
   return (
     <Modal
@@ -176,7 +143,7 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
                     <Text style={styles.cardLabel}>Screen Heights</Text>
                     <View style={styles.cardValueContainer}>
                       <Text style={styles.cardValue}>
-                        {formatNumber(stats.totalScreenHeights)}
+                        {formatNumber(aggregatedStats.totalScreenHeights)}
                       </Text>
                       <Text style={styles.cardUnit}>screens</Text>
                     </View>
@@ -187,10 +154,10 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
                     <Text style={styles.cardLabel}>Scrolling Time</Text>
                     <View style={styles.cardValueContainer}>
                       <Text style={styles.cardValue}>
-                        {formatTimeForCard(stats.totalScrollingTime).value}
+                        {formatTimeForCard(aggregatedStats.totalScrollingTime).value}
                       </Text>
                       <Text style={styles.cardUnit}>
-                        {formatTimeForCard(stats.totalScrollingTime).unit}
+                        {formatTimeForCard(aggregatedStats.totalScrollingTime).unit}
                       </Text>
                     </View>
                   </View>
@@ -200,9 +167,9 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
               {/* Top Domains */}
               <View style={styles.domainsSection}>
                 <Text style={styles.sectionTitle}>By Domain</Text>
-                {stats.domainStats.map((domainStat) => {
+                {aggregatedStats.domainStats.map((domainStat) => {
                   const isExpanded = expandedDomain === domainStat.domain;
-                  const progressWidth = (domainStat.totalDistance / maxDistance) * 100;
+                  const progressWidth = (domainStat.scrollMetrics.distanceMeters / maxDistance) * 100;
 
                   return (
                     <TouchableOpacity
@@ -217,11 +184,11 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
                         <View style={styles.domainInfo}>
                           <Text style={styles.domainName}>{domainStat.domain}</Text>
                           <Text style={styles.domainSubtext}>
-                            {formatTime(domainStat.totalTime)} · {domainStat.sessionCount} session{domainStat.sessionCount !== 1 ? 's' : ''}
+                            {formatTime(domainStat.timeMetrics.totalTime)}
                           </Text>
                         </View>
                         <Text style={styles.domainDistance}>
-                          {formatDistance(domainStat.totalDistance)}
+                          {formatDistance(domainStat.scrollMetrics.distanceMeters)}
                         </Text>
                       </View>
 
@@ -241,19 +208,19 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
                           <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Scrolling Time:</Text>
                             <Text style={styles.detailValue}>
-                              {formatTime(domainStat.scrollingTime)}
+                              {formatTime(domainStat.timeMetrics.scrollingTime)}
                             </Text>
                           </View>
                           <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Total Time:</Text>
+                            <Text style={styles.detailLabel}>Screen Time:</Text>
                             <Text style={styles.detailValue}>
-                              {formatTime(domainStat.totalTime)}
+                              {formatTime(domainStat.timeMetrics.totalTime)}
                             </Text>
                           </View>
                           <View style={styles.detailRow}>
                             <Text style={styles.detailLabel}>Screen Heights:</Text>
                             <Text style={styles.detailValue}>
-                              {formatNumber(domainStat.screenHeights)}
+                              {formatNumber(domainStat.scrollMetrics.screenHeights)}
                             </Text>
                           </View>
                         </View>

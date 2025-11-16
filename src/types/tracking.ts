@@ -40,20 +40,11 @@ export interface TimeMetrics {
   totalTime: number; // milliseconds total time on page
 }
 
-export interface DomainSession {
+// Simple stats per domain (no sessions)
+export interface DomainStats {
   domain: string;
-  startTime: number;
-  endTime?: number;
   scrollMetrics: ScrollMetrics;
   timeMetrics: TimeMetrics;
-  url: string;
-}
-
-export interface SessionSummary {
-  domain: string;
-  totalScrollDistance: ScrollMetrics;
-  totalTime: TimeMetrics;
-  sessionCount: number;
   lastVisited: number;
 }
 

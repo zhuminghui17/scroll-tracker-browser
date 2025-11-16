@@ -8,7 +8,7 @@ import TabListView from './TabListView';
 import BookmarksView from './BookmarksView';
 import ScrollStatsView from './ScrollStatsView';
 import { Tab, HistoryEntry, Bookmark } from '../types/browser';
-import { DomainSession } from '../types/tracking';
+import { DomainStats } from '../types/tracking';
 import BrowserStorage from '../storage/BrowserStorage';
 
 const DEFAULT_URL = 'https://www.google.com';
@@ -68,7 +68,7 @@ const BrowserTabs: React.FC = () => {
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentSessions, setCurrentSessions] = useState<DomainSession[]>([]);
+  const [currentStats, setCurrentStats] = useState<DomainStats[]>([]);
 
   // Store refs to all tab WebViews
   const tabRefs = useRef<Map<string, BrowserViewRef>>(new Map());
@@ -349,31 +349,47 @@ const BrowserTabs: React.FC = () => {
     handleNavigate(url);
   };
 
-  // Get all sessions from all tabs
-  const getAllSessions = useCallback((): DomainSession[] => {
-    const allSessions: DomainSession[] = [];
+  // Get all stats from all tabs and merge them
+  const getAllStats = useCallback((): DomainStats[] => {
+    const statsMap = new Map<string, DomainStats>();
     
     tabRefs.current.forEach((ref) => {
       try {
-        const sessions = ref.getSessions();
-        if (sessions && Array.isArray(sessions)) {
-          allSessions.push(...sessions);
+        const stats = ref.getStats();
+        if (stats && Array.isArray(stats)) {
+          // Merge stats from all tabs by domain
+          stats.forEach((domainStat) => {
+            if (statsMap.has(domainStat.domain)) {
+              const existing = statsMap.get(domainStat.domain)!;
+              // Add up the metrics
+              existing.scrollMetrics.distanceCm += domainStat.scrollMetrics.distanceCm;
+              existing.scrollMetrics.distanceMeters += domainStat.scrollMetrics.distanceMeters;
+              existing.scrollMetrics.distanceFeet += domainStat.scrollMetrics.distanceFeet;
+              existing.scrollMetrics.distanceInches += domainStat.scrollMetrics.distanceInches;
+              existing.scrollMetrics.screenHeights += domainStat.scrollMetrics.screenHeights;
+              existing.timeMetrics.scrollingTime += domainStat.timeMetrics.scrollingTime;
+              existing.timeMetrics.totalTime += domainStat.timeMetrics.totalTime;
+              existing.lastVisited = Math.max(existing.lastVisited, domainStat.lastVisited);
+            } else {
+              statsMap.set(domainStat.domain, { ...domainStat });
+            }
+          });
         }
       } catch (error) {
-        console.error('[BrowserTabs] Error getting sessions from tab:', error);
+        console.error('[BrowserTabs] Error getting stats from tab:', error);
       }
     });
 
-    return allSessions;
+    return Array.from(statsMap.values());
   }, []);
 
-  // Refresh sessions data
-  const refreshSessions = useCallback(() => {
-    setCurrentSessions(getAllSessions());
-  }, [getAllSessions]);
+  // Refresh stats data
+  const refreshStats = useCallback(() => {
+    setCurrentStats(getAllStats());
+  }, [getAllStats]);
 
   const handleShowStats = () => {
-    refreshSessions(); // Get initial data
+    refreshStats(); // Get initial data
     setShowStats(true);
   };
 
@@ -467,9 +483,9 @@ const BrowserTabs: React.FC = () => {
       {/* Scroll Stats View */}
       <ScrollStatsView
         visible={showStats}
-        sessions={currentSessions}
+        stats={currentStats}
         onClose={() => setShowStats(false)}
-        onRefresh={refreshSessions}
+        onRefresh={refreshStats}
       />
     </View>
   );

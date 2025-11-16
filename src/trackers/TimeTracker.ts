@@ -6,7 +6,7 @@ export class TimeTracker {
   private sessionStartTime: number = 0;
   private scrollingTime: number = 0; // milliseconds spent scrolling
   
-  private lastScrollTime: number = 0;
+  private scrollSessionStartTime: number = 0; // When current scroll session started
   private isScrolling: boolean = false;
   private scrollTimeoutId: any = null;
   
@@ -16,7 +16,7 @@ export class TimeTracker {
   private totalPausedTime: number = 0; // Total time spent paused
   
   // Configuration
-  private readonly SCROLL_TIMEOUT = 150; // ms - time to consider scroll as "continuous"
+  private readonly SCROLL_TIMEOUT = 500; // ms - time after last scroll to end session
   private readonly MIN_DELTA = 2; // minimum deltaY to consider as active scroll
 
   constructor() {
@@ -32,25 +32,12 @@ export class TimeTracker {
     
     // Only track if scroll delta is significant
     if (absDelta > this.MIN_DELTA) {
-      // If we're already scrolling, add the time since last scroll
-      if (this.isScrolling && this.lastScrollTime > 0) {
-        const timeSinceLastScroll = timestamp - this.lastScrollTime;
-        
-        if (timeSinceLastScroll > 0 && timeSinceLastScroll <= this.SCROLL_TIMEOUT) {
-          // Continuous scrolling - add the time difference
-          this.scrollingTime += timeSinceLastScroll;
-          console.log(`[TimeTracker] Added ${timeSinceLastScroll}ms scrolling time`);
-        }
-      }
-      
-      // Start scrolling if not already
+      // Start new scroll session if not already scrolling
       if (!this.isScrolling) {
         this.isScrolling = true;
-        console.log('[TimeTracker] Scrolling started');
+        this.scrollSessionStartTime = timestamp;
+        console.log('[TimeTracker] Scroll session started');
       }
-      
-      // Update last scroll time
-      this.lastScrollTime = timestamp;
       
       // Clear existing timeout
       if (this.scrollTimeoutId) {
@@ -59,8 +46,14 @@ export class TimeTracker {
       
       // Set timeout to detect end of scrolling
       this.scrollTimeoutId = setTimeout(() => {
-        this.isScrolling = false;
-        console.log('[TimeTracker] Scrolling ended');
+        if (this.isScrolling && this.scrollSessionStartTime > 0) {
+          // Calculate and add the duration of this scroll session
+          const scrollDuration = Date.now() - this.scrollSessionStartTime;
+          this.scrollingTime += scrollDuration;
+          console.log(`[TimeTracker] Scroll session ended, added ${scrollDuration}ms (total: ${this.scrollingTime}ms)`);
+          this.isScrolling = false;
+          this.scrollSessionStartTime = 0;
+        }
       }, this.SCROLL_TIMEOUT);
     }
   }
@@ -73,13 +66,15 @@ export class TimeTracker {
     if (action === 'start') {
       if (!this.isScrolling) {
         this.isScrolling = true;
-        this.lastScrollTime = timestamp;
+        this.scrollSessionStartTime = timestamp;
       }
     } else if (action === 'end') {
-      if (this.isScrolling && this.lastScrollTime > 0) {
-        const scrollDuration = timestamp - this.lastScrollTime;
+      if (this.isScrolling && this.scrollSessionStartTime > 0) {
+        const scrollDuration = timestamp - this.scrollSessionStartTime;
         this.scrollingTime += scrollDuration;
+        console.log(`[TimeTracker] Touch scroll ended, added ${scrollDuration}ms`);
         this.isScrolling = false;
+        this.scrollSessionStartTime = 0;
       }
     }
   }
@@ -135,7 +130,7 @@ export class TimeTracker {
   reset(): void {
     this.sessionStartTime = Date.now();
     this.scrollingTime = 0;
-    this.lastScrollTime = 0;
+    this.scrollSessionStartTime = 0;
     this.isScrolling = false;
     this.isPaused = false;
     this.pauseStartTime = 0;

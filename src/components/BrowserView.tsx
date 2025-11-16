@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
-import DomainSessionManager from '../trackers/DomainSessionManager';
+import DomainStatsTracker from '../trackers/DomainStatsTracker';
 
 // JavaScript code to inject into the WebView for tracking
 const INJECTED_JAVASCRIPT = `
@@ -138,7 +138,7 @@ export interface BrowserViewRef {
   goForward: () => void;
   reload: () => void;
   loadUrl: (url: string) => void;
-  getSessions: () => any[];
+  getStats: () => any[];
   pause: () => void;
   resume: () => void;
 }
@@ -159,10 +159,10 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
   onNavigationStateChange,
 }, ref) {
   const webViewRef = useRef<WebView>(null);
-  const sessionManagerRef = useRef(new DomainSessionManager());
+  const statsTrackerRef = useRef(new DomainStatsTracker());
   const currentUrlRef = useRef(initialUrl);
 
-  // Expose navigation methods and session data to parent
+  // Expose navigation methods and stats data to parent
   useImperativeHandle(ref, () => ({
     goBack: () => {
       webViewRef.current?.goBack();
@@ -177,25 +177,25 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
       webViewRef.current?.injectJavaScript(`window.location.href = "${url}";`);
       currentUrlRef.current = url;
     },
-    getSessions: () => {
-      return sessionManagerRef.current.getAllSessions();
+    getStats: () => {
+      return statsTrackerRef.current.getAllStats();
     },
     pause: () => {
-      sessionManagerRef.current.pause();
+      statsTrackerRef.current.pause();
     },
     resume: () => {
-      sessionManagerRef.current.resume();
+      statsTrackerRef.current.resume();
     },
   }));
 
   useEffect(() => {
-    // Initialize session on mount
-    sessionManagerRef.current.startSession(initialUrl);
+    // Initialize tracking for initial URL
+    statsTrackerRef.current.switchDomain(initialUrl);
 
     // Cleanup on unmount
     return () => {
-      sessionManagerRef.current.endCurrentSession();
-      console.log(`[BrowserView] Tab ${tabId} unmounted, session ended`);
+      statsTrackerRef.current.pause();
+      console.log(`[BrowserView] Tab ${tabId} unmounted, tracking paused`);
     };
   }, [initialUrl, tabId]);
 
@@ -203,7 +203,7 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
   const handleMessage = (event: WebViewMessageEvent) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      const sessionManager = sessionManagerRef.current;
+      const statsTracker = statsTrackerRef.current;
 
       switch (data.type) {
         case 'init':
@@ -211,7 +211,7 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
           break;
 
         case 'scroll':
-          sessionManager.processScrollEvent(
+          statsTracker.processScrollEvent(
             data.scrollY,
             data.deltaY,
             data.viewportHeight,
@@ -220,22 +220,22 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
           
           // Log metrics periodically (every 20 scroll events to avoid spam)
           if (Math.random() < 0.05) {
-            sessionManager.logCurrentMetrics();
+            statsTracker.logCurrentMetrics();
           }
           break;
 
         case 'touch':
-          sessionManager.processTouchEvent(data.action, data.timestamp);
+          statsTracker.processTouchEvent(data.action, data.timestamp);
           break;
 
         case 'page_load':
           console.log(`[BrowserView] Page loaded: ${data.url}`);
-          sessionManager.handleUrlChange(data.url);
+          statsTracker.switchDomain(data.url);
           break;
 
         case 'url_change':
           console.log(`[BrowserView] URL changed: ${data.oldUrl} -> ${data.newUrl}`);
-          sessionManager.handleUrlChange(data.newUrl);
+          statsTracker.switchDomain(data.newUrl);
           break;
 
         default:
@@ -250,7 +250,7 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
   const handleNavigationStateChange = (navState: any) => {
     if (navState.url && navState.url !== currentUrlRef.current) {
       currentUrlRef.current = navState.url;
-      sessionManagerRef.current.handleUrlChange(navState.url);
+      statsTrackerRef.current.switchDomain(navState.url);
       onUrlChange?.(navState.url);
     }
 
