@@ -7,9 +7,9 @@
  */
 export function formatDistance(meters: number): string {
   if (meters >= 1000) {
-    return `${(meters / 1000).toFixed(3)} km`; // 1.111 km
+    return `${(meters / 1000).toFixed(2)} km`; // 1.11 km
   }
-  return `${(meters).toFixed(3)} m`; // 1.111 m
+  return `${(meters).toFixed(2)} m`; // 1.11 m
 }
 
 /**
@@ -67,12 +67,12 @@ export function formatNumber(num: number): string {
 export function formatDistanceForCard(meters: number): { value: string; unit: string } {
   if (meters >= 1000) {
     return {
-      value: (meters / 1000).toFixed(3),
+      value: (meters / 1000).toFixed(2),
       unit: 'km',
     };
   }
   return {
-    value: (meters).toFixed(3),
+    value: (meters).toFixed(2),
     unit: 'm',
   };
 }
