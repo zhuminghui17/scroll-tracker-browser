@@ -6,7 +6,6 @@ export interface ScrollEvent {
   deltaY: number;
   timestamp: number;
   url: string;
-  viewportHeight: number;
 }
 
 export interface TouchEvent {

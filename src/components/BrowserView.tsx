@@ -41,7 +41,6 @@ const INJECTED_JAVASCRIPT = `
     const now = Date.now();
     const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
     const deltaY = scrollY - lastScrollY;
-    const viewportHeight = window.innerHeight;
     
     sendMessage({
       type: 'scroll',
@@ -49,7 +48,6 @@ const INJECTED_JAVASCRIPT = `
       deltaY: deltaY,
       timestamp: now,
       url: window.location.href,
-      viewportHeight: viewportHeight,
     });
     
     lastScrollY = scrollY;
@@ -251,7 +249,6 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
           statsTracker.processScrollEvent(
             data.scrollY,
             data.deltaY,
-            data.viewportHeight,
             data.timestamp
           );
           
