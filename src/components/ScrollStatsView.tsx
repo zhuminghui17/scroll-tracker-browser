@@ -39,12 +39,23 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
   useEffect(() => {
     if (!visible || !onRefresh) return;
 
+    // Call immediately when visible
+    onRefresh();
+
     const intervalId = setInterval(() => {
       onRefresh();
     }, 500);
 
     return () => clearInterval(intervalId);
   }, [visible, onRefresh]);
+
+  // Log when stats change
+  useEffect(() => {
+    if (visible && stats.length > 0) {
+      const totalPixels = stats.reduce((sum, s) => sum + s.scrollMetrics.distancePixels, 0);
+      console.log('[ScrollStatsView] Stats updated, total pixels:', totalPixels);
+    }
+  }, [stats, visible]);
 
   // Calculate aggregated stats
   const calculateStats = () => {

@@ -122,12 +122,14 @@ export class DomainStatsTracker {
     const stats: DomainStats[] = [];
 
     this.domainStats.forEach((tracker, domain) => {
+      const scrollMetrics = tracker.scrollTracker.getCurrentMetrics();
       stats.push({
         domain,
-        scrollMetrics: tracker.scrollTracker.getCurrentMetrics(),
+        scrollMetrics,
         timeMetrics: tracker.timeTracker.getCurrentMetrics(),
         lastVisited: tracker.lastVisited,
       });
+      console.log(`[DomainStatsTracker] ${domain}: ${scrollMetrics.distancePixels}px`);
     });
 
     return stats;

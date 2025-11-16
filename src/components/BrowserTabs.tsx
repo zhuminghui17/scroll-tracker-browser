@@ -340,7 +340,9 @@ const BrowserTabs: React.FC = () => {
 
   // Refresh stats data
   const refreshStats = useCallback(() => {
-    setCurrentStats(getAllStats());
+    const stats = getAllStats();
+    console.log('[BrowserTabs] Refreshing stats, total domains:', stats.length);
+    setCurrentStats(stats);
   }, [getAllStats]);
 
   const handleShowStats = () => {

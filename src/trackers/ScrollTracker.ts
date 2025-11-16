@@ -18,6 +18,10 @@ export class ScrollTracker {
     const absDeltaY = Math.abs(deltaY);
     this.totalScrollPoints += absDeltaY;
     
+    if (Math.random() < 0.05) { // Log 5% of scroll events
+      console.log(`[ScrollTracker] deltaY: ${deltaY}, total: ${this.totalScrollPoints}px`);
+    }
+    
     this.lastScrollY = scrollY;
 
     return this.getCurrentMetrics();

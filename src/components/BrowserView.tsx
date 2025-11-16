@@ -246,13 +246,17 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
           break;
 
         case 'scroll':
+          if (Math.random() < 0.05) { // Log 5% of scroll events
+            console.log(`[BrowserView] Scroll event: deltaY=${data.deltaY}, scrollY=${data.scrollY}`);
+          }
+          
           statsTracker.processScrollEvent(
             data.scrollY,
             data.deltaY,
             data.timestamp
           );
           
-          // Log metrics periodically (every 20 scroll events to avoid spam)
+          // Log metrics periodically
           if (Math.random() < 0.05) {
             statsTracker.logCurrentMetrics();
           }
