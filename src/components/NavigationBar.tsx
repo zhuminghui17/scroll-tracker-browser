@@ -10,6 +10,7 @@ import {
   Platform,
   ActionSheetIOS,
   Alert,
+  Keyboard,
 } from 'react-native';
 
 interface NavigationBarProps {
@@ -57,12 +58,16 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
   }, [url, isEditingUrl]);
 
   const handleUrlSubmit = () => {
-    setIsEditingUrl(false);
+    // Dismiss keyboard immediately
+    Keyboard.dismiss();
+    urlInputRef.current?.blur();
+    
     let finalUrl = editedUrl.trim();
 
     // If empty, don't navigate
     if (!finalUrl) {
       setEditedUrl(url);
+      setIsEditingUrl(false);
       return;
     }
 
@@ -79,6 +84,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
       }
     }
 
+    setIsEditingUrl(false);
     onNavigate(finalUrl);
   };
 
