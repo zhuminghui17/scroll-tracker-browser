@@ -15,10 +15,19 @@ export interface HistoryEntry {
   timestamp: number;
 }
 
+export interface Bookmark {
+  id: string;
+  url: string;
+  title: string;
+  domain: string;
+  timestamp: number;
+}
+
 export interface BrowserState {
   tabs: Tab[];
   activeTabId: string;
   history: HistoryEntry[];
+  bookmarks: Bookmark[];
 }
 
 export interface TabGridItem extends Tab {

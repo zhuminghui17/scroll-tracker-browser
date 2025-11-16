@@ -1,11 +1,12 @@
 // BrowserTabs: Main tab manager coordinating all browser components
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, StyleSheet, AppState } from 'react-native';
+import { View, StyleSheet, AppState, Alert } from 'react-native';
 import BrowserView, { BrowserViewRef } from './BrowserView';
 import NavigationBar from './NavigationBar';
 import TabListView from './TabListView';
-import { Tab, HistoryEntry } from '../types/browser';
+import BookmarksView from './BookmarksView';
+import { Tab, HistoryEntry, Bookmark } from '../types/browser';
 import BrowserStorage from '../storage/BrowserStorage';
 
 const DEFAULT_URL = 'https://www.google.com';
@@ -14,7 +15,9 @@ const BrowserTabs: React.FC = () => {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string>('');
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [showTabGrid, setShowTabGrid] = useState(false);
+  const [showBookmarks, setShowBookmarks] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Store refs to all tab WebViews
@@ -121,6 +124,34 @@ const BrowserTabs: React.FC = () => {
     });
   }, []);
 
+  // Add bookmark
+  const addBookmark = useCallback((url: string, title: string) => {
+    // Check if already bookmarked
+    const exists = bookmarks.some((b) => b.url === url);
+    if (exists) {
+      Alert.alert('Already Bookmarked', 'This page is already in your bookmarks.');
+      return;
+    }
+
+    const newBookmark: Bookmark = {
+      id: `bookmark_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      url,
+      title,
+      domain: extractDomain(url),
+      timestamp: Date.now(),
+    };
+
+    setBookmarks((prev) => [newBookmark, ...prev]);
+    Alert.alert('Bookmarked', `"${title}" has been added to your bookmarks.`);
+    console.log('[BrowserTabs] Added bookmark:', title);
+  }, [bookmarks]);
+
+  // Delete bookmark
+  const deleteBookmark = useCallback((bookmarkId: string) => {
+    setBookmarks((prev) => prev.filter((b) => b.id !== bookmarkId));
+    console.log('[BrowserTabs] Deleted bookmark:', bookmarkId);
+  }, []);
+
   // Load saved state on mount
   useEffect(() => {
     const loadState = async () => {
@@ -131,6 +162,7 @@ const BrowserTabs: React.FC = () => {
           setTabs(savedState.tabs);
           setActiveTabId(savedState.activeTabId);
           setHistory(savedState.history);
+          setBookmarks(savedState.bookmarks || []);
           console.log('[BrowserTabs] Restored browser state from storage');
         } else {
           // Create initial tab
@@ -158,6 +190,7 @@ const BrowserTabs: React.FC = () => {
           tabs,
           activeTabId,
           history,
+          bookmarks,
         });
         console.log('[BrowserTabs] Saved browser state');
       } catch (error) {
@@ -179,7 +212,7 @@ const BrowserTabs: React.FC = () => {
       clearTimeout(timeoutId);
       subscription.remove();
     };
-  }, [tabs, activeTabId, history, isLoading]);
+  }, [tabs, activeTabId, history, bookmarks, isLoading]);
 
   // Navigation handlers for active tab
   const handleBack = () => {
@@ -215,6 +248,21 @@ const BrowserTabs: React.FC = () => {
     // Menu action handled in NavigationBar
   };
 
+  const handleAddBookmark = () => {
+    const activeTab = tabs.find((tab) => tab.id === activeTabId);
+    if (activeTab) {
+      addBookmark(activeTab.url, activeTab.title || 'Untitled');
+    }
+  };
+
+  const handleShowBookmarks = () => {
+    setShowBookmarks(true);
+  };
+
+  const handleSelectBookmark = (url: string) => {
+    handleNavigate(url);
+  };
+
   // Get active tab data
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
 
@@ -237,6 +285,8 @@ const BrowserTabs: React.FC = () => {
         onShowTabs={handleShowTabs}
         onNewTab={handleNewTab}
         onShowMenu={handleShowMenu}
+        onAddBookmark={handleAddBookmark}
+        onShowBookmarks={handleShowBookmarks}
       />
 
       {/* WebView for each tab (only active one is visible) */}
@@ -283,6 +333,15 @@ const BrowserTabs: React.FC = () => {
         onSelectTab={switchTab}
         onCloseTab={closeTab}
         onNewTab={handleNewTab}
+      />
+
+      {/* Bookmarks View */}
+      <BookmarksView
+        visible={showBookmarks}
+        bookmarks={bookmarks}
+        onClose={() => setShowBookmarks(false)}
+        onSelectBookmark={handleSelectBookmark}
+        onDeleteBookmark={deleteBookmark}
       />
     </View>
   );

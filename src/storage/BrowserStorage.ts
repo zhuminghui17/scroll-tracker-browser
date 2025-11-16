@@ -1,12 +1,13 @@
 // Persistent storage for browser state using AsyncStorage
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Tab, HistoryEntry, BrowserState } from '../types/browser';
+import { Tab, HistoryEntry, Bookmark, BrowserState } from '../types/browser';
 
 const STORAGE_KEYS = {
   TABS: '@browser_tabs',
   ACTIVE_TAB: '@browser_active_tab',
   HISTORY: '@browser_history',
+  BOOKMARKS: '@browser_bookmarks',
 };
 
 export class BrowserStorage {
@@ -86,6 +87,32 @@ export class BrowserStorage {
     return [];
   }
 
+  // Save bookmarks
+  static async saveBookmarks(bookmarks: Bookmark[]): Promise<void> {
+    try {
+      const jsonValue = JSON.stringify(bookmarks);
+      await AsyncStorage.setItem(STORAGE_KEYS.BOOKMARKS, jsonValue);
+      console.log('[BrowserStorage] Saved bookmarks:', bookmarks.length, 'items');
+    } catch (error) {
+      console.error('[BrowserStorage] Error saving bookmarks:', error);
+    }
+  }
+
+  // Load bookmarks
+  static async loadBookmarks(): Promise<Bookmark[]> {
+    try {
+      const jsonValue = await AsyncStorage.getItem(STORAGE_KEYS.BOOKMARKS);
+      if (jsonValue) {
+        const bookmarks = JSON.parse(jsonValue);
+        console.log('[BrowserStorage] Loaded bookmarks:', bookmarks.length, 'items');
+        return bookmarks;
+      }
+    } catch (error) {
+      console.error('[BrowserStorage] Error loading bookmarks:', error);
+    }
+    return [];
+  }
+
   // Save complete browser state
   static async saveBrowserState(state: BrowserState): Promise<void> {
     try {
@@ -93,6 +120,7 @@ export class BrowserStorage {
         this.saveTabs(state.tabs),
         this.saveActiveTabId(state.activeTabId),
         this.saveHistory(state.history),
+        this.saveBookmarks(state.bookmarks),
       ]);
       console.log('[BrowserStorage] Browser state saved successfully');
     } catch (error) {
@@ -103,10 +131,11 @@ export class BrowserStorage {
   // Load complete browser state
   static async loadBrowserState(): Promise<BrowserState | null> {
     try {
-      const [tabs, activeTabId, history] = await Promise.all([
+      const [tabs, activeTabId, history, bookmarks] = await Promise.all([
         this.loadTabs(),
         this.loadActiveTabId(),
         this.loadHistory(),
+        this.loadBookmarks(),
       ]);
 
       if (tabs.length > 0 && activeTabId) {
@@ -115,6 +144,7 @@ export class BrowserStorage {
           tabs,
           activeTabId,
           history,
+          bookmarks: bookmarks || [],
         };
       }
     } catch (error) {
@@ -130,6 +160,7 @@ export class BrowserStorage {
         STORAGE_KEYS.TABS,
         STORAGE_KEYS.ACTIVE_TAB,
         STORAGE_KEYS.HISTORY,
+        STORAGE_KEYS.BOOKMARKS,
       ]);
       console.log('[BrowserStorage] All browser data cleared');
     } catch (error) {
