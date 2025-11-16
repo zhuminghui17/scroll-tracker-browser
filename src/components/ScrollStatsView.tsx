@@ -120,7 +120,7 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Statistics</Text>
+          <Text style={styles.headerTitle}>Scroll Stats</Text>
           <TouchableOpacity onPress={onClose} style={styles.doneButton}>
             <Text style={styles.doneButtonText}>Done</Text>
           </TouchableOpacity>
