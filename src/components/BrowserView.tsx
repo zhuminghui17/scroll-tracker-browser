@@ -15,6 +15,10 @@ const INJECTED_JAVASCRIPT = `
   let lastScrollY = 0;
   let lastTimestamp = Date.now();
   let isTracking = false;
+  
+  // Track scrollable containers separately
+  let containerScrollPositions = new Map();
+  let lastProcessedTime = 0;
 
   // Function to send data to React Native
   function sendMessage(data) {
@@ -23,39 +27,72 @@ const INJECTED_JAVASCRIPT = `
     }
   }
 
-  // Debounce function to limit event frequency
-  function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
-    };
-  }
-
   // Track scroll events
-  function handleScroll() {
+  function handleScroll(event) {
     const now = Date.now();
-    const scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop;
-    const deltaY = scrollY - lastScrollY;
     
-    sendMessage({
-      type: 'scroll',
-      scrollY: scrollY,
-      deltaY: deltaY,
-      timestamp: now,
-      url: window.location.href,
-    });
+    // Prevent processing the same scroll event multiple times within 10ms
+    // This deduplicates when both window and document listeners fire
+    if (now - lastProcessedTime < 10) {
+      return;
+    }
+    lastProcessedTime = now;
     
-    lastScrollY = scrollY;
+    let scrollY = 0;
+    let deltaY = 0;
+    let elementKey = 'window';
+    
+    // Check if this is a container scroll or window scroll
+    // event.scrollTop is stored at top level by throttledScroll
+    if (event && event.target && event.target !== document && event.scrollTop !== undefined) {
+      // Scrolling in a container element (like Pinterest's feed)
+      const target = event.target;
+      elementKey = (target.id || target.className || 'container').substring(0, 50); // Limit key length
+      scrollY = event.scrollTop; // Use the stored scrollTop value
+      
+      // Get last position for this specific container
+      const lastPosition = containerScrollPositions.get(elementKey) || 0;
+      deltaY = scrollY - lastPosition;
+      containerScrollPositions.set(elementKey, scrollY);
+    } else {
+      // Window scroll
+      scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+      deltaY = scrollY - lastScrollY;
+      lastScrollY = scrollY;
+    }
+    
+    // Only send if there's actual movement (>1px to avoid noise)
+    if (Math.abs(deltaY) > 1) {
+      sendMessage({
+        type: 'scroll',
+        scrollY: scrollY,
+        deltaY: deltaY,
+        timestamp: now,
+        url: window.location.href,
+      });
+    }
     lastTimestamp = now;
   }
 
-  // Debounced scroll handler (50ms)
-  const debouncedScroll = debounce(handleScroll, 50);
+  // Throttled scroll handler (fires at most every 50ms)
+  let scrollTimeout = null;
+  let pendingEvent = null;
+  function throttledScroll(event) {
+    // Store event data immediately (event object may be recycled)
+    pendingEvent = {
+      target: event ? event.target : null,
+      scrollTop: event && event.target ? event.target.scrollTop : undefined
+    };
+    
+    if (!scrollTimeout) {
+      scrollTimeout = setTimeout(() => {
+        handleScroll(pendingEvent);
+        scrollTimeout = null;
+        pendingEvent = null;
+      }, 50);
+    }
+  }
+
 
   // Track touch events for more accurate active time tracking
   function handleTouchStart() {
@@ -109,7 +146,9 @@ const INJECTED_JAVASCRIPT = `
   }, 500);
 
   // Add event listeners
-  window.addEventListener('scroll', debouncedScroll, { passive: true });
+  // Use capture phase to catch scroll events from both window and custom containers
+  // The 10ms deduplication in handleScroll prevents double-counting
+  document.addEventListener('scroll', throttledScroll, { passive: true, capture: true });
   window.addEventListener('touchstart', handleTouchStart, { passive: true });
   window.addEventListener('touchmove', handleTouchMove, { passive: true });
   window.addEventListener('touchend', handleTouchEnd, { passive: true });

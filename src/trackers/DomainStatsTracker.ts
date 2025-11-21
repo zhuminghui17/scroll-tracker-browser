@@ -140,13 +140,21 @@ export class DomainStatsTracker {
       // For domains like co.uk, github.io, etc., keep last 3 parts
       // Otherwise keep last 2 parts (domain.tld)
       const secondLevelTLDs = ['co', 'com', 'org', 'net', 'ac', 'gov', 'edu', 'mil'];
+      let domain;
       if (parts.length >= 3 && secondLevelTLDs.includes(parts[parts.length - 2])) {
         // Keep last 3 parts for domains like example.co.uk
-        return parts.slice(-3).join('.');
+        domain = parts.slice(-3).join('.');
+      } else {
+        // Keep last 2 parts for standard domains (domain.tld)
+        domain = parts.slice(-2).join('.');
       }
       
-      // Keep last 2 parts for standard domains (domain.tld)
-      return parts.slice(-2).join('.');
+      // Debug log for tracking issues
+      if (Math.random() < 0.05 && urlObj.hostname !== domain) {
+        console.log(`[DomainStatsTracker] Normalized ${urlObj.hostname} -> ${domain}`);
+      }
+      
+      return domain;
     } catch (error) {
       return 'unknown';
     }
