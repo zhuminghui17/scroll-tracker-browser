@@ -29,6 +29,7 @@ interface NavigationBarProps {
   onShowBookmarks: () => void;
   onShowStats: () => void;
   onShowDeviceSelection: () => void;
+  onResetStats: () => void;
 }
 
 const NavigationBar: React.FC<NavigationBarProps> = ({
@@ -47,6 +48,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
   onShowBookmarks,
   onShowStats,
   onShowDeviceSelection,
+  onResetStats,
 }) => {
   const [isEditingUrl, setIsEditingUrl] = useState(false);
   const [editedUrl, setEditedUrl] = useState(url);
@@ -100,9 +102,12 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
             'View Bookmarks',
             'View Scroll Stats',
             'Select Device',
+            'Reset Stats & Logs',
             'Refresh',
+            'Cancel',
           ],
-          cancelButtonIndex: 0,
+          destructiveButtonIndex: 5,
+          cancelButtonIndex: 7,
         },
         (buttonIndex) => {
           if (buttonIndex === 1) {
@@ -114,6 +119,8 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           } else if (buttonIndex === 4) {
             onShowDeviceSelection();
           } else if (buttonIndex === 5) {
+            onResetStats();
+          } else if (buttonIndex === 6) {
             onRefresh();
           }
         }
@@ -128,6 +135,7 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
           { text: 'View Bookmarks', onPress: onShowBookmarks },
           { text: 'View Scroll Stats', onPress: onShowStats },
           { text: 'Select Device', onPress: onShowDeviceSelection },
+          { text: 'Reset Stats & Logs', onPress: onResetStats, style: 'destructive' },
           { text: 'Refresh', onPress: onRefresh },
           { text: 'Cancel', style: 'cancel' },
         ]

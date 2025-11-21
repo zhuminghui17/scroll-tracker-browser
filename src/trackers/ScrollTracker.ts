@@ -8,8 +8,9 @@ export class ScrollTracker {
   private totalScrollPoints: number = 0;
   private lastScrollY: number = 0;
 
-  constructor() {
+  constructor(initialScrollPoints: number = 0) {
     this.deviceConfig = DeviceConfig.getInstance();
+    this.totalScrollPoints = initialScrollPoints;
   }
 
   // Process a scroll event and update metrics

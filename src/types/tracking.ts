@@ -35,7 +35,7 @@ export interface TimeMetrics {
   totalTime: number; // milliseconds total time on page
 }
 
-// Simple stats per domain (no sessions)
+// Simple stats per domain (aggregated)
 export interface DomainStats {
   domain: string;
   scrollMetrics: ScrollMetrics;
@@ -43,3 +43,12 @@ export interface DomainStats {
   lastVisited: number;
 }
 
+// Detailed session log for CSV export
+export interface SessionLog {
+  domain: string;
+  startTime: string; // ISO string
+  endTime: string; // ISO string
+  scrollDistance: number;
+  scrollTime: number;
+  totalTime: number;
+}

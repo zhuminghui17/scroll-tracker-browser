@@ -10,6 +10,7 @@ import ScrollStatsView from './ScrollStatsView';
 import DeviceSelectionView from './DeviceSelectionView';
 import { Tab, HistoryEntry, Bookmark } from '../types/browser';
 import { DomainStats } from '../types/tracking';
+import DomainStatsTracker from '../trackers/DomainStatsTracker';
 import BrowserStorage from '../storage/BrowserStorage';
 import { DEFAULT_BOOKMARKS } from '../constants/bookmarks';
 import { DeviceConfig } from '../utils/DeviceConfig';
@@ -310,32 +311,7 @@ const BrowserTabs: React.FC = () => {
 
   // Get all stats from all tabs and merge them
   const getAllStats = useCallback((): DomainStats[] => {
-    const statsMap = new Map<string, DomainStats>();
-    
-    tabRefs.current.forEach((ref) => {
-      try {
-        const stats = ref.getStats();
-        if (stats && Array.isArray(stats)) {
-          // Merge stats from all tabs by domain
-          stats.forEach((domainStat) => {
-            if (statsMap.has(domainStat.domain)) {
-              const existing = statsMap.get(domainStat.domain)!;
-              // Add up the metrics
-              existing.scrollMetrics.distancePixels += domainStat.scrollMetrics.distancePixels;
-              existing.timeMetrics.scrollingTime += domainStat.timeMetrics.scrollingTime;
-              existing.timeMetrics.totalTime += domainStat.timeMetrics.totalTime;
-              existing.lastVisited = Math.max(existing.lastVisited, domainStat.lastVisited);
-            } else {
-              statsMap.set(domainStat.domain, { ...domainStat });
-            }
-          });
-        }
-      } catch (error) {
-        console.error('[BrowserTabs] Error getting stats from tab:', error);
-      }
-    });
-
-    return Array.from(statsMap.values());
+    return DomainStatsTracker.getInstance().getAllStats();
   }, []);
 
   // Refresh stats data
@@ -371,6 +347,28 @@ const BrowserTabs: React.FC = () => {
     Alert.alert('Device Updated', `Device set to ${deviceModel}`);
     console.log('[BrowserTabs] Device changed to:', deviceModel);
   }, []);
+
+  const handleResetStats = useCallback(async () => {
+    Alert.alert(
+      'Reset All Data',
+      'Are you sure you want to clear all scroll stats and session logs? This cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            await DomainStatsTracker.getInstance().clearAllData();
+            refreshStats();
+            Alert.alert('Success', 'All stats and logs have been cleared.');
+          },
+        },
+      ]
+    );
+  }, [refreshStats]);
 
   // Initialize device config
   useEffect(() => {
@@ -410,6 +408,7 @@ const BrowserTabs: React.FC = () => {
         onShowBookmarks={handleShowBookmarks}
         onShowStats={handleShowStats}
         onShowDeviceSelection={handleShowDeviceSelection}
+        onResetStats={handleResetStats}
       />
 
       {/* WebView for each tab (only active one is visible) */}
