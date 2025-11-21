@@ -57,30 +57,6 @@ const INJECTED_JAVASCRIPT = `
   // Debounced scroll handler (50ms)
   const debouncedScroll = debounce(handleScroll, 50);
 
-  // Track touch events for more accurate active time tracking
-  function handleTouchStart() {
-    sendMessage({
-      type: 'touch',
-      action: 'start',
-      timestamp: Date.now(),
-    });
-  }
-
-  function handleTouchMove() {
-    sendMessage({
-      type: 'touch',
-      action: 'move',
-      timestamp: Date.now(),
-    });
-  }
-
-  function handleTouchEnd() {
-    sendMessage({
-      type: 'touch',
-      action: 'end',
-      timestamp: Date.now(),
-    });
-  }
 
   // Track page load
   function handlePageLoad() {
@@ -110,9 +86,6 @@ const INJECTED_JAVASCRIPT = `
 
   // Add event listeners
   window.addEventListener('scroll', debouncedScroll, { passive: true });
-  window.addEventListener('touchstart', handleTouchStart, { passive: true });
-  window.addEventListener('touchmove', handleTouchMove, { passive: true });
-  window.addEventListener('touchend', handleTouchEnd, { passive: true });
   
   // Notify that page is loaded
   if (document.readyState === 'complete') {
@@ -261,12 +234,6 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
           if (Math.random() < 0.05) {
             // statsTracker.logCurrentMetrics();
           }
-          break;
-
-        case 'touch':
-          // We need URL for touch event, but JS might not send it in 'touch' event type
-          // Let's assume the JS injection updates to include url, or we use currentUrlRef
-          statsTracker.processTouchEvent(currentUrlRef.current, data.action, data.timestamp);
           break;
 
         case 'page_load':

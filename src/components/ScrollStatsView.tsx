@@ -18,10 +18,8 @@ import { DomainStats, SessionLog } from '../types/tracking';
 import DomainStatsTracker from '../trackers/DomainStatsTracker';
 import {
   formatDistance,
-  formatTime,
   formatNumber,
   formatDistanceForCard,
-  formatTimeForCard,
   pixelsToScreenHeights,
 } from '../utils/formatters';
 
@@ -116,13 +114,9 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
   // Calculate aggregated stats
   const calculateStats = () => {
     let totalDistancePixels = 0;
-    let totalTime = 0;
-    let totalScrollingTime = 0;
 
     stats.forEach((domainStat) => {
       totalDistancePixels += domainStat.scrollMetrics.distancePixels;
-      totalTime += domainStat.timeMetrics.totalTime;
-      totalScrollingTime += domainStat.timeMetrics.scrollingTime;
     });
 
     // Sort domains by distance
@@ -135,11 +129,8 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
 
     return {
       totalDistancePixels,
-      totalTime,
-      totalScrollingTime,
       totalScreenHeights,
       domainStats: sortedDomains,
-      scrollingRatio: totalTime > 0 ? totalScrollingTime / totalTime : 0,
     };
   };
 
@@ -147,7 +138,6 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
   const hasData = stats.length > 0;
 
   const distanceCard = formatDistanceForCard(aggregatedStats.totalDistancePixels);
-  const timeCard = formatTimeForCard(aggregatedStats.totalTime);
 
   // Find max distance for progress bar scaling
   const maxDistancePixels = Math.max(...aggregatedStats.domainStats.map((d) => d.scrollMetrics.distancePixels), 1);
@@ -181,17 +171,6 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
                 </View>
               </View>
 
-              {/* Total Time */}
-              <View style={[styles.statsCard, styles.cardGreen]}>
-                <Text style={styles.cardLabel}>Screen Time</Text>
-                <View style={styles.cardValueContainer}>
-                  <Text style={styles.cardValue}>{timeCard.value}</Text>
-                  <Text style={styles.cardUnit}>{timeCard.unit}</Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.cardRow}>
               {/* Screen Heights */}
               <View style={[styles.statsCard, styles.cardPurple]}>
                 <Text style={styles.cardLabel}>Screen Heights</Text>
@@ -200,19 +179,6 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
                     {formatNumber(aggregatedStats.totalScreenHeights)}
                   </Text>
                   <Text style={styles.cardUnit}>screens</Text>
-                </View>
-              </View>
-
-              {/* Scrolling Time */}
-              <View style={[styles.statsCard, styles.cardOrange]}>
-                <Text style={styles.cardLabel}>Scrolling Time</Text>
-                <View style={styles.cardValueContainer}>
-                  <Text style={styles.cardValue}>
-                    {formatTimeForCard(aggregatedStats.totalScrollingTime).value}
-                  </Text>
-                  <Text style={styles.cardUnit}>
-                    {formatTimeForCard(aggregatedStats.totalScrollingTime).unit}
-                  </Text>
                 </View>
               </View>
             </View>
@@ -237,9 +203,6 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
                   <View style={styles.domainHeader}>
                     <View style={styles.domainInfo}>
                       <Text style={styles.domainName}>{domainStat.domain}</Text>
-                      <Text style={styles.domainSubtext}>
-                        {formatTime(domainStat.timeMetrics.totalTime)}
-                      </Text>
                     </View>
                     <Text style={styles.domainDistance}>
                       {formatDistance(domainStat.scrollMetrics.distancePixels)}
@@ -259,18 +222,6 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
                   {/* Expanded Details */}
                   {isExpanded && (
                     <View style={styles.expandedDetails}>
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Scrolling Time:</Text>
-                        <Text style={styles.detailValue}>
-                          {formatTime(domainStat.timeMetrics.scrollingTime)}
-                        </Text>
-                      </View>
-                      <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Screen Time:</Text>
-                        <Text style={styles.detailValue}>
-                          {formatTime(domainStat.timeMetrics.totalTime)}
-                        </Text>
-                      </View>
                       <View style={styles.detailRow}>
                         <Text style={styles.detailLabel}>Screen Heights:</Text>
                         <Text style={styles.detailValue}>
@@ -302,7 +253,6 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
             <Text style={[styles.tableHeaderCell, styles.colTime]}>Start</Text>
             <Text style={[styles.tableHeaderCell, styles.colTime]}>End</Text>
             <Text style={[styles.tableHeaderCell, styles.colMetric]}>Distance</Text>
-            <Text style={[styles.tableHeaderCell, styles.colMetric]}>Time</Text>
           </View>
           
           <ScrollView
@@ -328,9 +278,6 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
                   </Text>
                   <Text style={[styles.tableCell, styles.colMetric]}>
                     {formatDistance(log.scrollDistance)}
-                  </Text>
-                  <Text style={[styles.tableCell, styles.colMetric]}>
-                    {formatTime(log.totalTime)}
                   </Text>
                 </View>
               ))

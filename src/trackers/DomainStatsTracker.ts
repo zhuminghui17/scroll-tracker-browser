@@ -1,16 +1,13 @@
 // DomainStatsTracker: Global stats tracking service
 
 import { AppState, AppStateStatus } from 'react-native';
-import { DomainStats, ScrollMetrics, TimeMetrics, SessionLog } from '../types/tracking';
+import { DomainStats, ScrollMetrics, SessionLog } from '../types/tracking';
 import ScrollTracker from './ScrollTracker';
-import TimeTracker from './TimeTracker';
 import BrowserStorage from '../storage/BrowserStorage';
 
 interface SessionState {
   startTime: number;
   startScroll: number;
-  startScrollTime: number;
-  startTotalTime: number;
 }
 
 export class DomainStatsTracker {
@@ -18,7 +15,6 @@ export class DomainStatsTracker {
   
   private domainStats: Map<string, {
     scrollTracker: ScrollTracker;
-    timeTracker: TimeTracker;
     lastVisited: number;
   }> = new Map();
   
@@ -87,12 +83,9 @@ export class DomainStatsTracker {
         // Ensure we have valid data before creating trackers
         if (stat.domain) {
           const distance = stat.scrollMetrics?.distancePixels || 0;
-          const scrollingTime = stat.timeMetrics?.scrollingTime || 0;
-          const totalTime = stat.timeMetrics?.totalTime || 0;
           
           this.domainStats.set(stat.domain, {
             scrollTracker: new ScrollTracker(distance),
-            timeTracker: new TimeTracker(scrollingTime, totalTime),
             lastVisited: stat.lastVisited || Date.now()
           });
         }
@@ -138,11 +131,10 @@ export class DomainStatsTracker {
   }
 
   // Get or create tracker for a domain
-  private getOrCreateTracker(domain: string): { scrollTracker: ScrollTracker; timeTracker: TimeTracker; lastVisited: number } {
+  private getOrCreateTracker(domain: string): { scrollTracker: ScrollTracker; lastVisited: number } {
     if (!this.domainStats.has(domain)) {
       this.domainStats.set(domain, {
         scrollTracker: new ScrollTracker(),
-        timeTracker: new TimeTracker(),
         lastVisited: Date.now(),
       });
     }
@@ -153,13 +145,10 @@ export class DomainStatsTracker {
   private startSessionLog(domain: string) {
     const tracker = this.getOrCreateTracker(domain);
     const scrollMetrics = tracker.scrollTracker.getCurrentMetrics();
-    const timeMetrics = tracker.timeTracker.getCurrentMetrics();
 
     this.activeSessions.set(domain, {
       startTime: Date.now(),
       startScroll: scrollMetrics.distancePixels,
-      startScrollTime: timeMetrics.scrollingTime,
-      startTotalTime: timeMetrics.totalTime,
     });
     console.log(`[DomainStatsTracker] Started session log for ${domain}`);
   }
@@ -173,7 +162,6 @@ export class DomainStatsTracker {
     if (!tracker) return;
 
     const scrollMetrics = tracker.scrollTracker.getCurrentMetrics();
-    const timeMetrics = tracker.timeTracker.getCurrentMetrics();
     const endTime = Date.now();
 
     const log: SessionLog = {
@@ -181,22 +169,19 @@ export class DomainStatsTracker {
       startTime: new Date(sessionStart.startTime).toISOString(),
       endTime: new Date(endTime).toISOString(),
       scrollDistance: scrollMetrics.distancePixels - sessionStart.startScroll,
-      scrollTime: timeMetrics.scrollingTime - sessionStart.startScrollTime,
-      totalTime: timeMetrics.totalTime - sessionStart.startTotalTime,
     };
 
     // Only save logs with significant activity:
-    // 1. Must have scrolled at least 10 pixels
-    // 2. OR stayed on page for at least 5 seconds
-    if (log.scrollDistance > 10 && log.totalTime > 1000) {
+    // Must have scrolled at least 10 pixels
+    if (log.scrollDistance > 10) {
       this.sessionLogs.push(log);
       // Limit logs size (keep last 10000)
       if (this.sessionLogs.length > 10000) {
         this.sessionLogs = this.sessionLogs.slice(-10000);
       }
-      console.log(`[DomainStatsTracker] Logged session for ${domain}: ${log.totalTime}ms, ${log.scrollDistance}px`);
+      console.log(`[DomainStatsTracker] Logged session for ${domain}: ${log.scrollDistance}px`);
     } else {
-      console.log(`[DomainStatsTracker] Ignored insignificant session for ${domain}: ${log.totalTime}ms, ${log.scrollDistance}px`);
+      console.log(`[DomainStatsTracker] Ignored insignificant session for ${domain}: ${log.scrollDistance}px`);
     }
 
     this.activeSessions.delete(domain);
@@ -205,7 +190,6 @@ export class DomainStatsTracker {
   private pauseDomainTracking(domain: string) {
     const tracker = this.domainStats.get(domain);
     if (tracker) {
-      tracker.timeTracker.pause();
       this.endSessionLog(domain);
       this.save(); // Save on pause
     }
@@ -213,7 +197,6 @@ export class DomainStatsTracker {
 
   private resumeDomainTracking(domain: string) {
     const tracker = this.getOrCreateTracker(domain);
-    tracker.timeTracker.resume();
     tracker.lastVisited = Date.now();
     this.startSessionLog(domain);
   }
@@ -225,17 +208,7 @@ export class DomainStatsTracker {
 
     const tracker = this.getOrCreateTracker(domain);
     tracker.scrollTracker.processScrollEvent(scrollY, deltaY);
-    tracker.timeTracker.processScrollEvent(deltaY, timestamp);
     tracker.lastVisited = Date.now();
-  }
-
-  // Process touch event
-  processTouchEvent(url: string, action: 'start' | 'move' | 'end', timestamp: number): void {
-    const domain = this.extractDomain(url);
-    if (domain === 'system' || domain === 'unknown') return;
-
-    const tracker = this.getOrCreateTracker(domain);
-    tracker.timeTracker.processTouchEvent(action, timestamp);
   }
 
   // Pause tracking for a specific domain/tab
@@ -290,7 +263,6 @@ export class DomainStatsTracker {
       stats.push({
         domain,
         scrollMetrics,
-        timeMetrics: tracker.timeTracker.getCurrentMetrics(),
         lastVisited: tracker.lastVisited,
       });
     });
@@ -307,7 +279,7 @@ export class DomainStatsTracker {
 
   // Export logs as CSV string
   exportLogsCSV(): string {
-    const header = 'domain,start_timestamp,end_timestamp,scroll_distance_pixels,scroll_distance_cm,scroll_time_ms,total_time_ms';
+    const header = 'domain,start_timestamp,end_timestamp,scroll_distance_pixels,scroll_distance_cm';
     const rows = this.sessionLogs.map(log => {
       // Convert pixels to cm using device PPI
       const DeviceConfig = require('../utils/DeviceConfig').DeviceConfig;
@@ -315,7 +287,7 @@ export class DomainStatsTracker {
       const inches = log.scrollDistance / ppi;
       const cm = inches * 2.54;
       
-      return `${log.domain},${log.startTime},${log.endTime},${Math.round(log.scrollDistance)},${cm.toFixed(2)},${Math.round(log.scrollTime)},${Math.round(log.totalTime)}`;
+      return `${log.domain},${log.startTime},${log.endTime},${Math.round(log.scrollDistance)},${cm.toFixed(2)}`;
     });
     
     return [header, ...rows].join('\n');

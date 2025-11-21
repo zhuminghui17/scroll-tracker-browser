@@ -57,43 +57,6 @@ export function formatDistance(pixels: number): string {
   return `${cm.toFixed(1)} cm`;
 }
 
-/**
- * Format time in milliseconds to human-readable string
- * @param ms Time in milliseconds
- * @returns Formatted string like "2h 34m" or "45s"
- */
-export function formatTime(ms: number): string {
-  const seconds = Math.floor(ms / 1000);
-  
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
-  
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) {
-    const remainingSeconds = seconds % 60;
-    if (remainingSeconds > 0) {
-      return `${minutes}m ${remainingSeconds}s`;
-    }
-    return `${minutes}m`;
-  }
-  
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  if (remainingMinutes > 0) {
-    return `${hours}h ${remainingMinutes}m`;
-  }
-  return `${hours}h`;
-}
-
-/**
- * Format percentage
- * @param ratio Ratio between 0 and 1
- * @returns Formatted string like "75%"
- */
-export function formatPercentage(ratio: number): string {
-  return `${Math.round(ratio * 100)}%`;
-}
 
 /**
  * Format number with comma separators
@@ -127,31 +90,6 @@ export function formatDistanceForCard(pixels: number): { value: string; unit: st
   return {
     value: cm.toFixed(1),
     unit: 'cm',
-  };
-}
-
-/**
- * Format time for display in stats cards
- * @param ms Time in milliseconds
- * @returns Object with value and unit
- */
-export function formatTimeForCard(ms: number): { value: string; unit: string } {
-  const seconds = Math.floor(ms / 1000);
-  
-  if (seconds < 60) {
-    return { value: seconds.toString(), unit: 's' };
-  }
-  
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) {
-    return { value: minutes.toString(), unit: 'min' };
-  }
-  
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-  return {
-    value: `${hours}:${remainingMinutes.toString().padStart(2, '0')}`,
-    unit: 'h',
   };
 }
 

@@ -30,16 +30,10 @@ export interface ScrollMetrics {
   distancePixels: number; // Total scroll distance in pixels (device pixels/points)
 }
 
-export interface TimeMetrics {
-  scrollingTime: number; // milliseconds spent scrolling (fingers moving)
-  totalTime: number; // milliseconds total time on page
-}
-
 // Simple stats per domain (aggregated)
 export interface DomainStats {
   domain: string;
   scrollMetrics: ScrollMetrics;
-  timeMetrics: TimeMetrics;
   lastVisited: number;
 }
 
@@ -49,6 +43,4 @@ export interface SessionLog {
   startTime: string; // ISO string
   endTime: string; // ISO string
   scrollDistance: number;
-  scrollTime: number;
-  totalTime: number;
 }
