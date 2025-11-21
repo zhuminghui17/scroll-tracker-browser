@@ -43,6 +43,8 @@ export class DomainStatsTracker {
     AppState.addEventListener('change', this.handleAppStateChange);
   }
 
+  private initialized: boolean = false;
+
   static getInstance(): DomainStatsTracker {
     if (!DomainStatsTracker.instance) {
       DomainStatsTracker.instance = new DomainStatsTracker();
@@ -104,9 +106,15 @@ export class DomainStatsTracker {
       this.sessionLogs = logs;
       console.log(`[DomainStatsTracker] Initialized with ${this.sessionLogs.length} session logs`);
     }
+    this.initialized = true;
+    console.log('[DomainStatsTracker] Initialization complete');
   }
 
   async save() {
+     if (!this.initialized) {
+       console.log('[DomainStatsTracker] Skipping save, not initialized');
+       return;
+     }
      const stats = this.getAllStats();
      if (stats.length > 0) {
        await BrowserStorage.saveStats(stats);
