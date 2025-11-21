@@ -1,321 +1,131 @@
 # Scroll Tracker Browser
 
-A React Native iOS app with an embedded browser that tracks scroll distance, time spent browsing, and domain sessions in real-time.
+<p align="left">
+  <img src="./assets/icon.png" alt="Logo" width="100"/>
+</p>
 
-## Features
+Version: 0.0.5
 
-- **Full-Screen Browser**: Built with `react-native-webview` for seamless browsing experience
-- **Scroll Distance Tracking**: Measures scroll distance in:
-  - Centimeters / Meters
-  - Inches / Feet
-  - Screen heights
-- **Time Tracking**: 
-  - Active scrolling time (when user is actively scrolling)
-  - Passive viewing time (when user is viewing without scrolling)
-  - Total session time
-- **Domain Session Management**: 
-  - Automatically detects domain changes
-  - Tracks per-domain metrics
-  - Logs session start/end with statistics
-- **Device-Specific Accuracy**: Uses device PPI for accurate distance calculations
-- **Real-Time Logging**: All tracking metrics logged to console for verification
+A minimal, demo-ready iOS browser (Expo + React Native) that measures how people really browse—recording distance scrolled, active vs passive time, and per-domain sessions in real time.
 
-## Project Structure
+> Status: ✅ Feature-complete for logging + analytics demos. All metrics stream to the console instantly, making it perfect for live walkthroughs or investor previews.
 
-```
-ScrollTrackerBrowser/
-├── App.tsx                              # Main app entry point
-├── app.json                             # Expo configuration
-├── package.json                         # Dependencies
-├── tsconfig.json                        # TypeScript config
-└── src/
-    ├── components/
-    │   └── BrowserView.tsx             # WebView with tracking integration
-    ├── trackers/
-    │   ├── ScrollTracker.ts            # Scroll distance calculations
-    │   ├── TimeTracker.ts              # Active/passive time tracking
-    │   └── DomainSessionManager.ts     # Domain session management
-    ├── utils/
-    │   └── DeviceConfig.ts             # iPhone PPI lookup table
-    └── types/
-        └── tracking.ts                 # TypeScript interfaces
-```
+## Highlights
 
-## Architecture
+- **Full-screen WebView** instrumented with a custom JavaScript bridge—no distracting chrome.
+- **Distance, time, and session tracking** with centimeter, meter, inch, foot, and screen-height readouts.
+- **Domain intelligence** that starts/ends sessions automatically when URLs change (including SPA detection).
+- **Device-aware calculations** using a curated PPI table for 25+ iPhone models (configurable fallback).
+- **Zero-config logging** so you can narrate impact in real time from the Metro / RN debugger console.
 
-### 3-Layer Architecture
+## Stack & Layout
 
-**Layer 1: Browser UI (BrowserView.tsx)**
-- Full-screen WebView component
-- JavaScript injection for event capture
-- Message handling between WebView and React Native
-
-**Layer 2: Tracking Logic (src/trackers/)**
-- `ScrollTracker`: Converts scroll deltas to physical distances using device PPI
-- `TimeTracker`: Detects active scrolling vs passive viewing time
-- `DomainSessionManager`: Manages sessions per domain, aggregates metrics
-
-**Layer 3: Configuration & Types**
-- `DeviceConfig`: PPI lookup for 25+ iPhone models
-- `tracking.ts`: TypeScript interfaces for type safety
-
-### Data Flow
+- Expo SDK 54, React Native 0.81, TypeScript 5.9, `react-native-webview`.
+- Core files live at repo root (this directory). No nested workspace required.
 
 ```
-WebView (JavaScript Events)
-    ↓
-postMessage (JSON)
-    ↓
-BrowserView.handleMessage()
-    ↓
-DomainSessionManager
-    ↓
-ScrollTracker + TimeTracker
-    ↓
-Console Logs (Real-time metrics)
+scroll-tracker-browser/
+├── App.tsx                  # Entry + provider wiring
+├── assets/                  # App icon + splash artwork
+├── src/
+│   ├── components/          # Browser chrome, stats views, device selector, etc.
+│   ├── trackers/            # ScrollTracker, TimeTracker, DomainSessionManager
+│   ├── storage/             # AsyncStorage helpers (session snapshots/export)
+│   ├── utils/               # DeviceConfig + shared helpers
+│   └── types/               # Tracking/event interfaces
+├── QUICKSTART.md            # 5-minute setup
+├── TESTING_GUIDE.md         # Scenario-based validation
+├── IMPLEMENTATION_SUMMARY.md # Deep dive + status log
+└── PUBLISH_GUIDE.md         # TestFlight walkthrough
 ```
 
-## How It Works
-
-### Scroll Tracking
-
-1. JavaScript is injected into each loaded page
-2. Scroll events captured with 50ms debouncing
-3. Scroll delta (deltaY) sent to React Native
-4. ScrollTracker converts points to physical units:
-   ```
-   distanceCm = scrollPoints / (devicePPI / 2.54)
-   ```
-
-### Time Tracking
-
-1. Touch events (`touchstart`, `touchmove`, `touchend`) captured
-2. Active scrolling detected when:
-   - `deltaY > 2px` within `150ms` window
-3. Time calculated as:
-   - **Active Time**: Sum of all active scroll bursts
-   - **Passive Time**: Total time - Active time
-
-### Domain Session Management
-
-1. URL changes detected via:
-   - `onNavigationStateChange` (page navigation)
-   - JavaScript polling (SPA route changes)
-2. Domain extracted from URL
-3. New session started on domain change
-4. Previous session ended with final metrics
-
-## Installation & Setup
+## Getting Started
 
 ### Prerequisites
 
-- Node.js 20+ (current: v20.19.3 works despite warnings)
-- Xcode 14+ (for iOS development)
-- Expo CLI
-- iOS Simulator or physical iPhone
+- Node.js 20+
+- Xcode 14+ with an iOS simulator (or a physical iPhone with Expo Go)
+- Expo CLI (`npm install -g expo-cli`, optional but convenient)
 
-### Install Dependencies
+### Install & run
 
 ```bash
-cd ScrollTrackerBrowser
+git clone <repo-url> scroll-tracker-browser
+cd scroll-tracker-browser
 npm install
+npm start        # or npm run ios / npm run android (android untested)
 ```
 
-Dependencies installed:
-- `expo` - React Native framework
-- `react-native-webview` - WebView component
-- `react-native` - Core RN library
+When Metro starts, press `i` for the iOS simulator or scan the QR code in Expo Go to run on device.
 
-### Run on iOS Simulator
+## Running a Live Demo
 
-```bash
-npm run ios
-```
+1. **Start Metro** with `npm start` and press `i`.
+2. **Confirm Google loads** (default `initialUrl`).
+3. **Scroll naturally** on a long feed like YouTube or Reddit.
+4. **Narrate the console logs** (Metro terminal or RN debugger). Highlight scroll distance, time splits, and session events.
+5. **Navigate to a second domain** (e.g., tap a YouTube link) to show session boundaries.
+6. **Call out accuracy** by mentioning the PPI lookup and physical units.
 
-Or using Expo:
+### Suggested talking points
 
-```bash
-npx expo start
-# Then press 'i' for iOS simulator
-```
+- Distance increases in centimeters/meters every flick.
+- Active time rises while scrolling; passive time fills in when reading.
+- Session end/start logs prove domain detection works, even inside SPAs.
 
-### Run on Physical iPhone
-
-1. Install Expo Go app on your iPhone
-2. Run:
-   ```bash
-   npx expo start
-   ```
-3. Scan QR code with your iPhone camera
-4. App will open in Expo Go
-
-## Usage
-
-1. **Launch the app**: Opens with Google homepage by default
-2. **Browse naturally**: Navigate to any website (e.g., YouTube, Instagram)
-3. **Scroll**: Just scroll normally
-4. **Check console**: Open React Native debugger to see real-time logs
-
-### Console Output Example
+### Sample console output
 
 ```
 [DeviceConfig] Using default device configuration
 [SESSION] Started new session for: google.com
-[WebView] Tracking script injected
-[BrowserView] WebView tracking initialized
-[BrowserView] Page loaded: https://www.google.com
-
 [SCROLL] Domain: google.com, Distance: 15.2cm (0.152m), 0.5ft (6.0in), Screen Heights: 2.3
 [TIME] Active: 3s, Passive: 12s, Total: 15s
-
 [SESSION] Domain changed: google.com -> youtube.com
 [SESSION] Ended session for: google.com, Duration: 15.4s, Scroll: 15.2cm
-
-====== Session Metrics for youtube.com ======
-[SCROLL] Domain: youtube.com, Distance: 125.3cm (1.253m), 4.11ft (49.3in), Screen Heights: 18.7
-[TIME] Active: 25s, Passive: 45s, Total: 70s
-==================================================
 ```
 
-## Configuration
+## Observability Cheat Sheet
 
-### Change Initial URL
+- Logs appear in the Metro terminal, Chrome DevTools (Cmd+Ctrl+Z → “Debug”), and Xcode device logs.
+- Key tags:
+  - `[SCROLL]` aggregate distance (cm/m/in/ft/screen heights).
+  - `[TIME]` active vs passive vs total seconds.
+  - `[SESSION]` lifecycle events with duration + totals.
+  - `[WebView]` instrumentation lifecycle (script injected, page loaded, etc.).
 
-Edit `App.tsx`:
+## Configuration & Tuning
 
-```typescript
-<BrowserView initialUrl="https://www.youtube.com" />
-```
+| What | Where | Notes |
+|------|-------|-------|
+| Initial URL | `App.tsx` (`<BrowserView initialUrl="https://www.youtube.com" />`) | Change default landing page. |
+| Device PPI | `src/utils/DeviceConfig.ts` | Choose a preset or set a custom fallback. |
+| Scroll sensitivity | `src/trackers/TimeTracker.ts` (`MIN_DELTA`, `SCROLL_TIMEOUT`) | Lower delta = more sensitive “active” time. |
+| Scroll debounce | `BrowserView.tsx` injected JS (`debounce(handleScroll, 50)`) | Increase to reduce log volume. |
 
-### Device PPI Configuration
+## Testing & Validation
 
-Current supported devices (in `DeviceConfig.ts`):
-- iPhone 15 Pro Max/Pro/Plus/Mini
-- iPhone 14 Pro Max/Pro/Plus/Mini
-- iPhone 13 Pro Max/Pro/Mini
-- iPhone 12 Pro Max/Pro/Mini
-- iPhone 11 Pro Max/Pro
-- iPhone XS Max/XS/XR/X
-- iPhone SE (all generations)
-
-Default: iPhone 14 Pro (460 PPI)
-
-### Adjust Tracking Parameters
-
-In `TimeTracker.ts`:
-```typescript
-private readonly SCROLL_TIMEOUT = 150; // ms
-private readonly MIN_DELTA = 2; // pixels
-```
-
-In `BrowserView.tsx` (JavaScript injection):
-```javascript
-const debouncedScroll = debounce(handleScroll, 50); // ms
-```
-
-## Key Algorithms
-
-### Distance Calculation
-
-```typescript
-// Convert scroll points to physical distance
-const ppi = deviceConfig.getPPI(); // e.g., 460 for iPhone 14 Pro
-const inches = scrollPoints / ppi;
-const centimeters = inches * 2.54;
-const meters = centimeters / 100;
-const feet = inches / 12;
-```
-
-### Active Scroll Detection
-
-```typescript
-// Active if deltaY > 2px within 150ms
-if (Math.abs(deltaY) > 2 && timeSinceLastScroll <= 150) {
-  activeScrollTime += timeSinceLastScroll;
-}
-```
-
-### Screen Heights Calculation
-
-```typescript
-screenHeights = totalScrollPoints / viewportHeight;
-```
-
-## Testing
-
-### Test Scroll Tracking
-
-1. Open the app
-2. Navigate to a long page (e.g., Reddit, Twitter)
-3. Scroll continuously for 10 seconds
-4. Check console for scroll distance logs
-5. Verify distance increases
-
-### Test Time Tracking
-
-1. Start scrolling actively
-2. Stop and wait 5 seconds (passive time)
-3. Scroll again
-4. Check console: Active time should be < Total time
-
-### Test Domain Sessions
-
-1. Start on Google
-2. Navigate to YouTube
-3. Check console for:
-   - "Session ended" for Google
-   - "Started new session" for YouTube
-
-## Known Limitations
-
-- **No Data Persistence**: Metrics only logged to console (no storage yet)
-- **No UI Dashboard**: Focus is on browser functionality and tracking accuracy
-- **iOS Only**: Configured for iOS, Android not tested
-- **No Device Auto-Detection**: Uses default PPI (can be changed manually)
-
-## Future Enhancements
-
-- Add AsyncStorage for data persistence
-- Create stats dashboard (TodayView, HistoryView)
-- Add URL bar and navigation controls
-- Implement device auto-detection
-- Add data export functionality
-- Support Android platform
+- Run through the curated scenarios in `TESTING_GUIDE.md` to validate browser loading, distance accuracy, time tracking, domain transitions, and SPA resilience.
+- For a rapid check, see `QUICKSTART.md` (setup) followed by:
+  - **Scroll Distance Test:** Scroll 2+ screen heights; verify `[SCROLL]` increments realistically.
+  - **Active vs Passive:** Scroll for 5s, pause 10s, scroll 3s; confirm `[TIME]` splits.
+  - **Session Swap:** Move from Google to YouTube; ensure handoff logs fire.
 
 ## Troubleshooting
 
-### WebView not loading
+- **WebView blank:** Confirm Xcode 14+ installed, `NSAllowsArbitraryLoads` true (already configured in `app.json`).
+- **No scroll logs:** Use a long feed, ensure delta > 2px, or reduce `MIN_DELTA`.
+- **Metrics look off:** Double-check PPI selection and simulator model.
+- **Stale JS after navigation:** Reload with `Cmd+R`; injected script runs per page load and on SPA route polling.
+- **Build cache issues:** `npx expo start -c` then restart Metro.
 
-- Check network permissions in `app.json`
-- Verify `NSAllowsArbitraryLoads` is set to `true`
+## Additional Docs & Next Steps
 
-### JavaScript injection not working
-
-- Check React Native debugger console
-- Look for "Tracking script injected" message
-- Verify WebView has `javaScriptEnabled={true}`
-
-### No scroll events
-
-- Try scrolling on a long page (not a short page)
-- Check debounce delay (50ms)
-- Verify scroll events in browser console
-
-### Build errors
-
-- Clear cache: `npx expo start -c`
-- Reinstall: `rm -rf node_modules && npm install`
-- Check Node version: `node -v` (should be 20+)
+- `IMPLEMENTATION_SUMMARY.md` – detailed architecture notes and status.
+- `QUICKSTART.md` – condensed operator checklist.
+- `TESTING_GUIDE.md` – full validation suite.
+- `PUBLISH_GUIDE.md` – complete TestFlight workflow.
+- Future roadmap: data persistence, stats UI, export, device auto-detect, Android support.
 
 ## License
 
-MIT License
-
-## Author
-
-Matt Zhu
-
----
-
-**Note**: This is a development version focused on browser functionality and tracking accuracy. Stats visualization and data persistence will be added in future versions.
-
+MIT License © Matt Zhu
