@@ -125,10 +125,10 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
       totalScrollingTime += domainStat.timeMetrics.scrollingTime;
     });
 
-    // Sort domains by distance
-    const sortedDomains = [...stats].sort(
-      (a, b) => b.scrollMetrics.distancePixels - a.scrollMetrics.distancePixels
-    );
+    // Filter domains with distance > 0 and sort by distance
+    const sortedDomains = [...stats]
+      .filter((domainStat) => domainStat.scrollMetrics.distancePixels > 0)
+      .sort((a, b) => b.scrollMetrics.distancePixels - a.scrollMetrics.distancePixels);
 
     // Calculate total screen heights from total distance pixels
     const totalScreenHeights = pixelsToScreenHeights(totalDistancePixels);
