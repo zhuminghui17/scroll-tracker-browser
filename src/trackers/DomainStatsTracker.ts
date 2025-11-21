@@ -188,7 +188,7 @@ export class DomainStatsTracker {
     // Only save logs with significant activity:
     // 1. Must have scrolled at least 10 pixels
     // 2. OR stayed on page for at least 5 seconds
-    if (log.scrollDistance > 10 || log.totalTime > 5000) {
+    if (log.scrollDistance > 10 && log.totalTime > 1000) {
       this.sessionLogs.push(log);
       // Limit logs size (keep last 10000)
       if (this.sessionLogs.length > 10000) {
