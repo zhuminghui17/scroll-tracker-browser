@@ -9,8 +9,11 @@ import {
   StyleSheet,
   Modal,
   Dimensions,
+  Share,
+  Alert,
 } from 'react-native';
-import { DomainStats } from '../types/tracking';
+import { DomainStats, SessionLog } from '../types/tracking';
+import DomainStatsTracker from '../trackers/DomainStatsTracker';
 import {
   formatDistance,
   formatTime,
@@ -34,28 +37,53 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
   onRefresh,
 }) => {
   const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'stats' | 'logs'>('stats');
+  const [sessionLogs, setSessionLogs] = useState<SessionLog[]>([]);
 
-  // Auto-refresh stats every 500ms when visible
+  // Auto-refresh stats and logs every 500ms when visible
   useEffect(() => {
     if (!visible || !onRefresh) return;
 
     // Call immediately when visible
     onRefresh();
+    refreshLogs();
 
     const intervalId = setInterval(() => {
       onRefresh();
+      refreshLogs();
     }, 500);
 
     return () => clearInterval(intervalId);
   }, [visible, onRefresh]);
 
+  const refreshLogs = () => {
+    const logs = DomainStatsTracker.getInstance().getSessionLogs();
+    setSessionLogs(logs);
+  };
+
   // Log when stats change
   useEffect(() => {
     if (visible && stats.length > 0) {
       const totalPixels = stats.reduce((sum, s) => sum + s.scrollMetrics.distancePixels, 0);
-      console.log('[ScrollStatsView] Stats updated, total pixels:', totalPixels);
+      // console.log('[ScrollStatsView] Stats updated, total pixels:', totalPixels);
     }
   }, [stats, visible]);
+
+  const handleExport = async () => {
+    try {
+      const csv = DomainStatsTracker.getInstance().exportLogsCSV();
+      const result = await Share.share({
+        message: csv,
+        title: 'scroll_tracker_logs.csv',
+      });
+      
+      if (result.action === Share.sharedAction) {
+        console.log('CSV Shared successfully');
+      }
+    } catch (error: any) {
+      Alert.alert('Error', 'Could not export logs: ' + error.message);
+    }
+  };
 
   // Calculate aggregated stats
   const calculateStats = () => {
@@ -96,6 +124,195 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
   // Find max distance for progress bar scaling
   const maxDistancePixels = Math.max(...aggregatedStats.domainStats.map((d) => d.scrollMetrics.distancePixels), 1);
 
+  const renderStatsView = () => (
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.content}
+      showsVerticalScrollIndicator={false}
+    >
+      {!hasData ? (
+        // Empty State
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>📊</Text>
+          <Text style={styles.emptyTitle}>No data yet</Text>
+          <Text style={styles.emptySubtitle}>
+            Start browsing and scrolling to see your statistics
+          </Text>
+        </View>
+      ) : (
+        <>
+          {/* Summary Cards */}
+          <View style={styles.summarySection}>
+            <View style={styles.cardRow}>
+              {/* Total Distance */}
+              <View style={[styles.statsCard, styles.cardBlue]}>
+                <Text style={styles.cardLabel}>Distance</Text>
+                <View style={styles.cardValueContainer}>
+                  <Text style={styles.cardValue}>{distanceCard.value}</Text>
+                  <Text style={styles.cardUnit}>{distanceCard.unit}</Text>
+                </View>
+              </View>
+
+              {/* Total Time */}
+              <View style={[styles.statsCard, styles.cardGreen]}>
+                <Text style={styles.cardLabel}>Screen Time</Text>
+                <View style={styles.cardValueContainer}>
+                  <Text style={styles.cardValue}>{timeCard.value}</Text>
+                  <Text style={styles.cardUnit}>{timeCard.unit}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.cardRow}>
+              {/* Screen Heights */}
+              <View style={[styles.statsCard, styles.cardPurple]}>
+                <Text style={styles.cardLabel}>Screen Heights</Text>
+                <View style={styles.cardValueContainer}>
+                  <Text style={styles.cardValue}>
+                    {formatNumber(aggregatedStats.totalScreenHeights)}
+                  </Text>
+                  <Text style={styles.cardUnit}>screens</Text>
+                </View>
+              </View>
+
+              {/* Scrolling Time */}
+              <View style={[styles.statsCard, styles.cardOrange]}>
+                <Text style={styles.cardLabel}>Scrolling Time</Text>
+                <View style={styles.cardValueContainer}>
+                  <Text style={styles.cardValue}>
+                    {formatTimeForCard(aggregatedStats.totalScrollingTime).value}
+                  </Text>
+                  <Text style={styles.cardUnit}>
+                    {formatTimeForCard(aggregatedStats.totalScrollingTime).unit}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Top Domains */}
+          <View style={styles.domainsSection}>
+            <Text style={styles.sectionTitle}>By Domain</Text>
+            {aggregatedStats.domainStats.map((domainStat) => {
+              const isExpanded = expandedDomain === domainStat.domain;
+              const progressWidth = (domainStat.scrollMetrics.distancePixels / maxDistancePixels) * 100;
+
+              return (
+                <TouchableOpacity
+                  key={domainStat.domain}
+                  style={styles.domainCard}
+                  onPress={() =>
+                    setExpandedDomain(isExpanded ? null : domainStat.domain)
+                  }
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.domainHeader}>
+                    <View style={styles.domainInfo}>
+                      <Text style={styles.domainName}>{domainStat.domain}</Text>
+                      <Text style={styles.domainSubtext}>
+                        {formatTime(domainStat.timeMetrics.totalTime)}
+                      </Text>
+                    </View>
+                    <Text style={styles.domainDistance}>
+                      {formatDistance(domainStat.scrollMetrics.distancePixels)}
+                    </Text>
+                  </View>
+
+                  {/* Progress Bar */}
+                  <View style={styles.progressBarContainer}>
+                    <View
+                      style={[
+                        styles.progressBarFill,
+                        { width: `${progressWidth}%` },
+                      ]}
+                    />
+                  </View>
+
+                  {/* Expanded Details */}
+                  {isExpanded && (
+                    <View style={styles.expandedDetails}>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Scrolling Time:</Text>
+                        <Text style={styles.detailValue}>
+                          {formatTime(domainStat.timeMetrics.scrollingTime)}
+                        </Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Screen Time:</Text>
+                        <Text style={styles.detailValue}>
+                          {formatTime(domainStat.timeMetrics.totalTime)}
+                        </Text>
+                      </View>
+                      <View style={styles.detailRow}>
+                        <Text style={styles.detailLabel}>Screen Heights:</Text>
+                        <Text style={styles.detailValue}>
+                          {formatNumber(pixelsToScreenHeights(domainStat.scrollMetrics.distancePixels))}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </>
+      )}
+    </ScrollView>
+  );
+
+  const renderLogsView = () => (
+    <View style={styles.tableContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{flexGrow: 1}}
+      >
+        <View>
+          {/* Header Row */}
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableHeaderCell, styles.colDomain]}>Domain</Text>
+            <Text style={[styles.tableHeaderCell, styles.colTime]}>Start</Text>
+            <Text style={[styles.tableHeaderCell, styles.colTime]}>End</Text>
+            <Text style={[styles.tableHeaderCell, styles.colMetric]}>Distance</Text>
+            <Text style={[styles.tableHeaderCell, styles.colMetric]}>Time</Text>
+          </View>
+          
+          <ScrollView
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+          >
+            {sessionLogs.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyIcon}>📋</Text>
+                <Text style={styles.emptyTitle}>No logs yet</Text>
+              </View>
+            ) : (
+              sessionLogs.map((log, index) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text style={[styles.tableCell, styles.colDomain]} numberOfLines={1}>
+                    {log.domain}
+                  </Text>
+                  <Text style={[styles.tableCell, styles.colTime]}>
+                    {new Date(log.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+                  </Text>
+                  <Text style={[styles.tableCell, styles.colTime]}>
+                    {new Date(log.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })}
+                  </Text>
+                  <Text style={[styles.tableCell, styles.colMetric]}>
+                    {formatDistance(log.scrollDistance)}
+                  </Text>
+                  <Text style={[styles.tableCell, styles.colMetric]}>
+                    {formatTime(log.totalTime)}
+                  </Text>
+                </View>
+              ))
+            )}
+          </ScrollView>
+        </View>
+      </ScrollView>
+    </View>
+  );
+
   return (
     <Modal
       visible={visible}
@@ -106,145 +323,29 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Scroll Stats</Text>
+          <TouchableOpacity onPress={handleExport} style={styles.exportButton}>
+            <Text style={styles.exportButtonText}>Export CSV</Text>
+          </TouchableOpacity>
+          <View style={styles.toggleContainer}>
+            <TouchableOpacity 
+              style={[styles.toggleButton, viewMode === 'stats' && styles.toggleButtonActive]}
+              onPress={() => setViewMode('stats')}
+            >
+              <Text style={[styles.toggleText, viewMode === 'stats' && styles.toggleTextActive]}>Stats</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.toggleButton, viewMode === 'logs' && styles.toggleButtonActive]}
+              onPress={() => setViewMode('logs')}
+            >
+              <Text style={[styles.toggleText, viewMode === 'logs' && styles.toggleTextActive]}>Logs</Text>
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity onPress={onClose} style={styles.doneButton}>
             <Text style={styles.doneButtonText}>Done</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}
-        >
-          {!hasData ? (
-            // Empty State
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>📊</Text>
-              <Text style={styles.emptyTitle}>No data yet</Text>
-              <Text style={styles.emptySubtitle}>
-                Start browsing and scrolling to see your statistics
-              </Text>
-            </View>
-          ) : (
-            <>
-              {/* Summary Cards */}
-              <View style={styles.summarySection}>
-                <View style={styles.cardRow}>
-                  {/* Total Distance */}
-                  <View style={[styles.statsCard, styles.cardBlue]}>
-                    <Text style={styles.cardLabel}>Distance</Text>
-                    <View style={styles.cardValueContainer}>
-                      <Text style={styles.cardValue}>{distanceCard.value}</Text>
-                      <Text style={styles.cardUnit}>{distanceCard.unit}</Text>
-                    </View>
-                  </View>
-
-                  {/* Total Time */}
-                  <View style={[styles.statsCard, styles.cardGreen]}>
-                    <Text style={styles.cardLabel}>Screen Time</Text>
-                    <View style={styles.cardValueContainer}>
-                      <Text style={styles.cardValue}>{timeCard.value}</Text>
-                      <Text style={styles.cardUnit}>{timeCard.unit}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={styles.cardRow}>
-                  {/* Screen Heights */}
-                  <View style={[styles.statsCard, styles.cardPurple]}>
-                    <Text style={styles.cardLabel}>Screen Heights</Text>
-                    <View style={styles.cardValueContainer}>
-                      <Text style={styles.cardValue}>
-                        {formatNumber(aggregatedStats.totalScreenHeights)}
-                      </Text>
-                      <Text style={styles.cardUnit}>screens</Text>
-                    </View>
-                  </View>
-
-                  {/* Scrolling Time */}
-                  <View style={[styles.statsCard, styles.cardOrange]}>
-                    <Text style={styles.cardLabel}>Scrolling Time</Text>
-                    <View style={styles.cardValueContainer}>
-                      <Text style={styles.cardValue}>
-                        {formatTimeForCard(aggregatedStats.totalScrollingTime).value}
-                      </Text>
-                      <Text style={styles.cardUnit}>
-                        {formatTimeForCard(aggregatedStats.totalScrollingTime).unit}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* Top Domains */}
-              <View style={styles.domainsSection}>
-                <Text style={styles.sectionTitle}>By Domain</Text>
-                {aggregatedStats.domainStats.map((domainStat) => {
-                  const isExpanded = expandedDomain === domainStat.domain;
-                  const progressWidth = (domainStat.scrollMetrics.distancePixels / maxDistancePixels) * 100;
-
-                  return (
-                    <TouchableOpacity
-                      key={domainStat.domain}
-                      style={styles.domainCard}
-                      onPress={() =>
-                        setExpandedDomain(isExpanded ? null : domainStat.domain)
-                      }
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.domainHeader}>
-                        <View style={styles.domainInfo}>
-                          <Text style={styles.domainName}>{domainStat.domain}</Text>
-                          <Text style={styles.domainSubtext}>
-                            {formatTime(domainStat.timeMetrics.totalTime)}
-                          </Text>
-                        </View>
-                        <Text style={styles.domainDistance}>
-                          {formatDistance(domainStat.scrollMetrics.distancePixels)}
-                        </Text>
-                      </View>
-
-                      {/* Progress Bar */}
-                      <View style={styles.progressBarContainer}>
-                        <View
-                          style={[
-                            styles.progressBarFill,
-                            { width: `${progressWidth}%` },
-                          ]}
-                        />
-                      </View>
-
-                      {/* Expanded Details */}
-                      {isExpanded && (
-                        <View style={styles.expandedDetails}>
-                          <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Scrolling Time:</Text>
-                            <Text style={styles.detailValue}>
-                              {formatTime(domainStat.timeMetrics.scrollingTime)}
-                            </Text>
-                          </View>
-                          <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Screen Time:</Text>
-                            <Text style={styles.detailValue}>
-                              {formatTime(domainStat.timeMetrics.totalTime)}
-                            </Text>
-                          </View>
-                          <View style={styles.detailRow}>
-                            <Text style={styles.detailLabel}>Screen Heights:</Text>
-                            <Text style={styles.detailValue}>
-                              {formatNumber(pixelsToScreenHeights(domainStat.scrollMetrics.distancePixels))}
-                            </Text>
-                          </View>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </>
-          )}
-        </ScrollView>
+        {viewMode === 'stats' ? renderStatsView() : renderLogsView()}
       </View>
     </Modal>
   );
@@ -262,22 +363,60 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    paddingTop: 60,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingTop: 20,
     backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 18,
     fontWeight: '600',
     color: '#000000',
-    letterSpacing: -0.5,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F0F0F0',
+    borderRadius: 8,
+    padding: 2,
+  },
+  toggleButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  toggleButtonActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  toggleText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#8E8E93',
+  },
+  toggleTextActive: {
+    color: '#000000',
+    fontWeight: '600',
   },
   doneButton: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 6,
   },
   doneButtonText: {
+    fontSize: 17,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  exportButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  exportButtonText: {
     fontSize: 17,
     color: '#007AFF',
     fontWeight: '500',
@@ -452,7 +591,47 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#000000',
   },
+  // Logs styles
+  tableContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+    paddingBottom: 8,
+    marginBottom: 8,
+  },
+  tableHeaderCell: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+    alignItems: 'center',
+  },
+  tableCell: {
+    fontSize: 13,
+    color: '#000000',
+  },
+  colDomain: {
+    width: 120,
+    paddingRight: 8,
+  },
+  colTime: {
+    width: 80,
+  },
+  colMetric: {
+    width: 80,
+    textAlign: 'right',
+  },
 });
 
 export default ScrollStatsView;
-
