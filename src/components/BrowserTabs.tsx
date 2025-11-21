@@ -348,6 +348,28 @@ const BrowserTabs: React.FC = () => {
     console.log('[BrowserTabs] Device changed to:', deviceModel);
   }, []);
 
+  const handleResetStats = useCallback(async () => {
+    Alert.alert(
+      'Reset All Data',
+      'Are you sure you want to clear all scroll stats and session logs? This cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            await DomainStatsTracker.getInstance().clearAllData();
+            refreshStats();
+            Alert.alert('Success', 'All stats and logs have been cleared.');
+          },
+        },
+      ]
+    );
+  }, [refreshStats]);
+
   // Initialize device config
   useEffect(() => {
     const initDevice = async () => {
@@ -386,6 +408,7 @@ const BrowserTabs: React.FC = () => {
         onShowBookmarks={handleShowBookmarks}
         onShowStats={handleShowStats}
         onShowDeviceSelection={handleShowDeviceSelection}
+        onResetStats={handleResetStats}
       />
 
       {/* WebView for each tab (only active one is visible) */}
