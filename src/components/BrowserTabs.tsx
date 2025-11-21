@@ -401,6 +401,15 @@ const BrowserTabs: React.FC = () => {
   // Get active tab data
   const activeTab = tabs.find((tab) => tab.id === activeTabId);
 
+  // Calculate visible tab count (exclude new tabs unless they're active)
+  const visibleTabCount = tabs.filter((tab) => {
+    const isActive = tab.id === activeTabId;
+    if (tab.url === 'about:newtab' && !isActive) {
+      return false;
+    }
+    return true;
+  }).length;
+
   if (isLoading) {
     return <View style={styles.container} />;
   }
@@ -412,7 +421,7 @@ const BrowserTabs: React.FC = () => {
         url={activeTab?.url || DEFAULT_URL}
         canGoBack={activeTab?.canGoBack || false}
         canGoForward={activeTab?.canGoForward || false}
-        tabCount={tabs.length}
+        tabCount={visibleTabCount}
         onBack={handleBack}
         onForward={handleForward}
         onRefresh={handleRefresh}
