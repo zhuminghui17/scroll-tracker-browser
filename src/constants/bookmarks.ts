@@ -5,16 +5,16 @@ import { Bookmark } from '../types/browser';
 export const DEFAULT_BOOKMARKS: Bookmark[] = [
   {
     id: 'default_youtube',
-    url: 'https://www.youtube.com',
+    url: 'https://www.m.youtube.com',
     title: 'YouTube',
-    domain: 'youtube.com',
+    domain: 'm.youtube.com',
     timestamp: Date.now(),
   },
   {
     id: 'default_webtoons',
-    url: 'https://www.webtoons.com',
+    url: 'https://www.m.webtoons.com',
     title: 'Webtoons',
-    domain: 'webtoons.com',
+    domain: 'm.webtoons.com',
     timestamp: Date.now(),
   },
   {
