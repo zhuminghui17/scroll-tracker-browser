@@ -307,10 +307,16 @@ export class DomainStatsTracker {
 
   // Export logs as CSV string
   exportLogsCSV(): string {
-    const header = 'domain,start_timestamp,end_timestamp,scroll_distance_pixels,scroll_time_ms,total_time_ms';
-    const rows = this.sessionLogs.map(log => 
-      `${log.domain},${log.startTime},${log.endTime},${Math.round(log.scrollDistance)},${Math.round(log.scrollTime)},${Math.round(log.totalTime)}`
-    );
+    const header = 'domain,start_timestamp,end_timestamp,scroll_distance_pixels,scroll_distance_cm,scroll_time_ms,total_time_ms';
+    const rows = this.sessionLogs.map(log => {
+      // Convert pixels to cm using device PPI
+      const DeviceConfig = require('../utils/DeviceConfig').DeviceConfig;
+      const ppi = DeviceConfig.getInstance().getPPI();
+      const inches = log.scrollDistance / ppi;
+      const cm = inches * 2.54;
+      
+      return `${log.domain},${log.startTime},${log.endTime},${Math.round(log.scrollDistance)},${cm.toFixed(2)},${Math.round(log.scrollTime)},${Math.round(log.totalTime)}`;
+    });
     
     return [header, ...rows].join('\n');
   }
