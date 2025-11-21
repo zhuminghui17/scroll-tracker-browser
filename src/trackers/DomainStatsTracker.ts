@@ -122,9 +122,24 @@ export class DomainStatsTracker {
     try {
       if (!url || url === 'about:newtab' || url === 'about:blank') return 'system';
       const urlObj = new URL(url);
-      // Remove 'www.' prefix if present
-      let domain = urlObj.hostname.replace(/^www\./, '');
-      return domain;
+      
+      // Extract base domain (domain + TLD, removing all subdomains)
+      // Examples: m.webtoons.com -> webtoons.com, en.wikipedia.org -> wikipedia.org
+      const parts = urlObj.hostname.split('.');
+      
+      // Handle edge cases
+      if (parts.length <= 1) return urlObj.hostname;
+      
+      // For domains like co.uk, github.io, etc., keep last 3 parts
+      // Otherwise keep last 2 parts (domain.tld)
+      const secondLevelTLDs = ['co', 'com', 'org', 'net', 'ac', 'gov', 'edu', 'mil'];
+      if (parts.length >= 3 && secondLevelTLDs.includes(parts[parts.length - 2])) {
+        // Keep last 3 parts for domains like example.co.uk
+        return parts.slice(-3).join('.');
+      }
+      
+      // Keep last 2 parts for standard domains (domain.tld)
+      return parts.slice(-2).join('.');
     } catch (error) {
       return 'unknown';
     }

@@ -84,7 +84,16 @@ const TabListView: React.FC<TabListViewProps> = ({
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
       >
-        {tabs.map((tab) => {
+        {tabs
+          .filter((tab) => {
+            // Only show "about:newtab" if it's the active tab
+            const isActive = tab.id === activeTabId;
+            if (tab.url === 'about:newtab' && !isActive) {
+              return false;
+            }
+            return true;
+          })
+          .map((tab) => {
           const isActive = tab.id === activeTabId;
           return (
             <TouchableOpacity
