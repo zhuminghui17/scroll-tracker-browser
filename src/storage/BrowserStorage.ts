@@ -2,6 +2,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Tab, HistoryEntry, Bookmark, BrowserState } from '../types/browser';
+import { SessionLog } from '../types/tracking';
 
 const STORAGE_KEYS = {
   TABS: '@browser_tabs',
@@ -9,6 +10,7 @@ const STORAGE_KEYS = {
   HISTORY: '@browser_history',
   BOOKMARKS: '@browser_bookmarks',
   STATS: '@browser_stats',
+  SESSION_LOGS: '@browser_session_logs',
 };
 
 export class BrowserStorage {
@@ -34,6 +36,32 @@ export class BrowserStorage {
       }
     } catch (error) {
       console.error('[BrowserStorage] Error loading stats:', error);
+    }
+    return [];
+  }
+
+  // Save session logs
+  static async saveSessionLogs(logs: SessionLog[]): Promise<void> {
+    try {
+      const jsonValue = JSON.stringify(logs);
+      await AsyncStorage.setItem(STORAGE_KEYS.SESSION_LOGS, jsonValue);
+      console.log('[BrowserStorage] Saved', logs.length, 'session logs');
+    } catch (error) {
+      console.error('[BrowserStorage] Error saving session logs:', error);
+    }
+  }
+
+  // Load session logs
+  static async loadSessionLogs(): Promise<SessionLog[]> {
+    try {
+      const jsonValue = await AsyncStorage.getItem(STORAGE_KEYS.SESSION_LOGS);
+      if (jsonValue) {
+        const logs = JSON.parse(jsonValue);
+        console.log('[BrowserStorage] Loaded', logs.length, 'session logs');
+        return logs;
+      }
+    } catch (error) {
+      console.error('[BrowserStorage] Error loading session logs:', error);
     }
     return [];
   }
@@ -189,6 +217,7 @@ export class BrowserStorage {
         STORAGE_KEYS.HISTORY,
         STORAGE_KEYS.BOOKMARKS,
         STORAGE_KEYS.STATS,
+        STORAGE_KEYS.SESSION_LOGS,
       ]);
       console.log('[BrowserStorage] All browser data cleared');
     } catch (error) {
