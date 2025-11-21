@@ -340,11 +340,14 @@ const BrowserTabs: React.FC = () => {
     setShowDeviceSelection(true);
   };
 
-  const handleSelectDevice = useCallback((deviceModel: string) => {
+  const handleSelectDevice = useCallback(async (deviceModel: string) => {
     const deviceConfig = DeviceConfig.getInstance();
     deviceConfig.setDevice(deviceModel);
     setCurrentDevice(deviceModel);
-    Alert.alert('Device Updated', `Device set to ${deviceModel}`);
+    
+    // Save device selection to storage
+    await BrowserStorage.saveDeviceModel(deviceModel);
+    
     console.log('[BrowserTabs] Device changed to:', deviceModel);
   }, []);
 
@@ -374,10 +377,23 @@ const BrowserTabs: React.FC = () => {
   useEffect(() => {
     const initDevice = async () => {
       const deviceConfig = DeviceConfig.getInstance();
-      await deviceConfig.autoDetectDevice();
-      const deviceInfo = deviceConfig.getDeviceInfo();
-      setCurrentDevice(deviceInfo.model);
-      console.log('[BrowserTabs] Device initialized:', deviceInfo.model);
+      
+      // Try to load saved device model
+      const savedDeviceModel = await BrowserStorage.loadDeviceModel();
+      
+      if (savedDeviceModel) {
+        // User has previously selected a device
+        deviceConfig.setDevice(savedDeviceModel);
+        setCurrentDevice(savedDeviceModel);
+        console.log('[BrowserTabs] Device loaded from storage:', savedDeviceModel);
+      } else {
+        // No device set - show selection prompt
+        await deviceConfig.autoDetectDevice();
+        const deviceInfo = deviceConfig.getDeviceInfo();
+        setCurrentDevice(deviceInfo.model);
+        setShowDeviceSelection(true);
+        console.log('[BrowserTabs] No device set - prompting for selection');
+      }
     };
     initDevice();
   }, []);

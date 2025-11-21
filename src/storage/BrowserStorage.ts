@@ -11,6 +11,7 @@ const STORAGE_KEYS = {
   BOOKMARKS: '@browser_bookmarks',
   STATS: '@browser_stats',
   SESSION_LOGS: '@browser_session_logs',
+  DEVICE_MODEL: '@browser_device_model',
 };
 
 export class BrowserStorage {
@@ -208,6 +209,30 @@ export class BrowserStorage {
     return null;
   }
 
+  // Save device model
+  static async saveDeviceModel(deviceModel: string): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.DEVICE_MODEL, deviceModel);
+      console.log('[BrowserStorage] Saved device model:', deviceModel);
+    } catch (error) {
+      console.error('[BrowserStorage] Error saving device model:', error);
+    }
+  }
+
+  // Load device model
+  static async loadDeviceModel(): Promise<string | null> {
+    try {
+      const deviceModel = await AsyncStorage.getItem(STORAGE_KEYS.DEVICE_MODEL);
+      if (deviceModel) {
+        console.log('[BrowserStorage] Loaded device model:', deviceModel);
+        return deviceModel;
+      }
+    } catch (error) {
+      console.error('[BrowserStorage] Error loading device model:', error);
+    }
+    return null;
+  }
+
   // Clear all browser data
   static async clearAll(): Promise<void> {
     try {
@@ -218,6 +243,7 @@ export class BrowserStorage {
         STORAGE_KEYS.BOOKMARKS,
         STORAGE_KEYS.STATS,
         STORAGE_KEYS.SESSION_LOGS,
+        STORAGE_KEYS.DEVICE_MODEL,
       ]);
       console.log('[BrowserStorage] All browser data cleared');
     } catch (error) {
