@@ -8,9 +8,36 @@ const STORAGE_KEYS = {
   ACTIVE_TAB: '@browser_active_tab',
   HISTORY: '@browser_history',
   BOOKMARKS: '@browser_bookmarks',
+  STATS: '@browser_stats',
 };
 
 export class BrowserStorage {
+  // Save domain stats
+  static async saveStats(stats: any[]): Promise<void> {
+    try {
+      const jsonValue = JSON.stringify(stats);
+      await AsyncStorage.setItem(STORAGE_KEYS.STATS, jsonValue);
+      console.log('[BrowserStorage] Saved stats for', stats.length, 'domains');
+    } catch (error) {
+      console.error('[BrowserStorage] Error saving stats:', error);
+    }
+  }
+
+  // Load domain stats
+  static async loadStats(): Promise<any[]> {
+    try {
+      const jsonValue = await AsyncStorage.getItem(STORAGE_KEYS.STATS);
+      if (jsonValue) {
+        const stats = JSON.parse(jsonValue);
+        console.log('[BrowserStorage] Loaded stats for', stats.length, 'domains');
+        return stats;
+      }
+    } catch (error) {
+      console.error('[BrowserStorage] Error loading stats:', error);
+    }
+    return [];
+  }
+
   // Save all tabs
   static async saveTabs(tabs: Tab[]): Promise<void> {
     try {
@@ -161,6 +188,7 @@ export class BrowserStorage {
         STORAGE_KEYS.ACTIVE_TAB,
         STORAGE_KEYS.HISTORY,
         STORAGE_KEYS.BOOKMARKS,
+        STORAGE_KEYS.STATS,
       ]);
       console.log('[BrowserStorage] All browser data cleared');
     } catch (error) {

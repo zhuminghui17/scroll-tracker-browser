@@ -1,27 +1,114 @@
-// DomainStatsTracker: Simple per-domain stats tracking without sessions
+// DomainStatsTracker: Global stats tracking service
 
+import { AppState, AppStateStatus } from 'react-native';
 import { DomainStats, ScrollMetrics, TimeMetrics } from '../types/tracking';
 import ScrollTracker from './ScrollTracker';
 import TimeTracker from './TimeTracker';
+import BrowserStorage from '../storage/BrowserStorage';
 
 export class DomainStatsTracker {
+  private static instance: DomainStatsTracker;
+  
   private domainStats: Map<string, {
     scrollTracker: ScrollTracker;
     timeTracker: TimeTracker;
     lastVisited: number;
   }> = new Map();
   
-  private currentDomain: string | null = null;
+  // Track active tabs per domain to handle multiple tabs on same domain
+  private activeTabsByDomain: Map<string, Set<string>> = new Map();
+  
+  private saveInterval: NodeJS.Timeout | null = null;
+  private isBackgrounded: boolean = false;
+
+  private constructor() {
+    this.initialize();
+    // Periodically save stats (every 30 seconds) to ensure data persistence
+    this.saveInterval = setInterval(() => {
+      this.save();
+    }, 30000);
+
+    // Handle app state changes to pause/resume tracking
+    AppState.addEventListener('change', this.handleAppStateChange);
+  }
+
+  static getInstance(): DomainStatsTracker {
+    if (!DomainStatsTracker.instance) {
+      DomainStatsTracker.instance = new DomainStatsTracker();
+    }
+    return DomainStatsTracker.instance;
+  }
+
+  private handleAppStateChange = (nextAppState: AppStateStatus) => {
+    if (nextAppState === 'background' || nextAppState === 'inactive') {
+      if (!this.isBackgrounded) {
+        // Pause all currently active trackers
+        this.activeTabsByDomain.forEach((tabs, domain) => {
+          if (tabs.size > 0) {
+            const tracker = this.domainStats.get(domain);
+            if (tracker) {
+              tracker.timeTracker.pause();
+            }
+          }
+        });
+        this.isBackgrounded = true;
+        this.save();
+        console.log('[DomainStatsTracker] App backgrounded, paused all trackers');
+      }
+    } else if (nextAppState === 'active') {
+      if (this.isBackgrounded) {
+        // Resume all previously active trackers
+        this.activeTabsByDomain.forEach((tabs, domain) => {
+          if (tabs.size > 0) {
+            const tracker = this.domainStats.get(domain);
+            if (tracker) {
+              tracker.timeTracker.resume();
+            }
+          }
+        });
+        this.isBackgrounded = false;
+        console.log('[DomainStatsTracker] App active, resumed trackers');
+      }
+    }
+  };
+
+  private async initialize() {
+    const stats = await BrowserStorage.loadStats();
+    if (stats && Array.isArray(stats)) {
+      stats.forEach((stat: any) => {
+        // Ensure we have valid data before creating trackers
+        if (stat.domain) {
+          const distance = stat.scrollMetrics?.distancePixels || 0;
+          const scrollingTime = stat.timeMetrics?.scrollingTime || 0;
+          const totalTime = stat.timeMetrics?.totalTime || 0;
+          
+          this.domainStats.set(stat.domain, {
+            scrollTracker: new ScrollTracker(distance),
+            timeTracker: new TimeTracker(scrollingTime, totalTime),
+            lastVisited: stat.lastVisited || Date.now()
+          });
+        }
+      });
+      console.log(`[DomainStatsTracker] Initialized with ${this.domainStats.size} domains`);
+    }
+  }
+
+  async save() {
+     const stats = this.getAllStats();
+     if (stats.length > 0) {
+       await BrowserStorage.saveStats(stats);
+     }
+  }
 
   // Extract domain from URL
   private extractDomain(url: string): string {
     try {
+      if (!url || url === 'about:newtab' || url === 'about:blank') return 'system';
       const urlObj = new URL(url);
       // Remove 'www.' prefix if present
       let domain = urlObj.hostname.replace(/^www\./, '');
       return domain;
     } catch (error) {
-      console.warn('[DomainStatsTracker] Invalid URL:', url);
       return 'unknown';
     }
   }
@@ -34,86 +121,69 @@ export class DomainStatsTracker {
         timeTracker: new TimeTracker(),
         lastVisited: Date.now(),
       });
-      console.log(`[DomainStatsTracker] Created new tracker for: ${domain}`);
     }
     return this.domainStats.get(domain)!;
   }
 
-  // Switch to tracking a different domain
-  switchDomain(url: string): void {
-    const newDomain = this.extractDomain(url);
-    
-    if (this.currentDomain === newDomain) {
-      return; // Already on this domain
-    }
+  // Process scroll event
+  processScrollEvent(url: string, scrollY: number, deltaY: number, timestamp: number): void {
+    const domain = this.extractDomain(url);
+    if (domain === 'system' || domain === 'unknown') return;
 
-    // Pause the previous domain's time tracker
-    if (this.currentDomain) {
-      const prevTracker = this.domainStats.get(this.currentDomain);
-      if (prevTracker) {
-        prevTracker.timeTracker.pause();
-        console.log(`[DomainStatsTracker] Paused: ${this.currentDomain}`);
-      }
-    }
-
-    // Resume (or create) the new domain's tracker
-    const newTracker = this.getOrCreateTracker(newDomain);
-    newTracker.timeTracker.resume();
-    newTracker.lastVisited = Date.now();
-    
-    this.currentDomain = newDomain;
-    console.log(`[DomainStatsTracker] Switched to: ${newDomain}`);
-  }
-
-  // Process scroll event for current domain
-  processScrollEvent(scrollY: number, deltaY: number, timestamp: number): void {
-    if (!this.currentDomain) {
-      if (Math.random() < 0.1) {
-        console.log('[DomainStatsTracker] Scroll event ignored - no current domain set');
-      }
-      return;
-    }
-
-    const tracker = this.domainStats.get(this.currentDomain);
-    if (!tracker) {
-      console.log('[DomainStatsTracker] Scroll event ignored - tracker not found for domain:', this.currentDomain);
-      return;
-    }
-
+    const tracker = this.getOrCreateTracker(domain);
     tracker.scrollTracker.processScrollEvent(scrollY, deltaY);
     tracker.timeTracker.processScrollEvent(deltaY, timestamp);
     tracker.lastVisited = Date.now();
   }
 
-  // Process touch event for current domain
-  processTouchEvent(action: 'start' | 'move' | 'end', timestamp: number): void {
-    if (!this.currentDomain) return;
+  // Process touch event
+  processTouchEvent(url: string, action: 'start' | 'move' | 'end', timestamp: number): void {
+    const domain = this.extractDomain(url);
+    if (domain === 'system' || domain === 'unknown') return;
 
-    const tracker = this.domainStats.get(this.currentDomain);
-    if (!tracker) return;
-
+    const tracker = this.getOrCreateTracker(domain);
     tracker.timeTracker.processTouchEvent(action, timestamp);
   }
 
-  // Pause tracking (when tab becomes inactive)
-  pause(): void {
-    if (!this.currentDomain) return;
+  // Pause tracking for a specific domain/tab
+  pause(url: string, tabId: string): void {
+    const domain = this.extractDomain(url);
+    if (domain === 'system' || domain === 'unknown') return;
 
-    const tracker = this.domainStats.get(this.currentDomain);
-    if (tracker) {
-      tracker.timeTracker.pause();
-      console.log('[DomainStatsTracker] Tracking paused');
+    if (!this.activeTabsByDomain.has(domain)) {
+      this.activeTabsByDomain.set(domain, new Set());
+    }
+    const activeTabs = this.activeTabsByDomain.get(domain)!;
+    activeTabs.delete(tabId);
+
+    // Only pause the tracker if NO tabs are active for this domain
+    // AND app is not already backgrounded (if backgrounded, it's already paused)
+    if (activeTabs.size === 0 && !this.isBackgrounded) {
+      const tracker = this.domainStats.get(domain);
+      if (tracker) {
+        tracker.timeTracker.pause();
+        this.save(); // Save on pause
+      }
     }
   }
 
-  // Resume tracking (when tab becomes active)
-  resume(): void {
-    if (!this.currentDomain) return;
+  // Resume tracking for a specific domain/tab
+  resume(url: string, tabId: string): void {
+    const domain = this.extractDomain(url);
+    if (domain === 'system' || domain === 'unknown') return;
 
-    const tracker = this.domainStats.get(this.currentDomain);
-    if (tracker) {
+    if (!this.activeTabsByDomain.has(domain)) {
+      this.activeTabsByDomain.set(domain, new Set());
+    }
+    const activeTabs = this.activeTabsByDomain.get(domain)!;
+    activeTabs.add(tabId);
+
+    // Ensure tracker is resumed
+    // Only if app is not backgrounded
+    if (!this.isBackgrounded) {
+      const tracker = this.getOrCreateTracker(domain);
       tracker.timeTracker.resume();
-      console.log('[DomainStatsTracker] Tracking resumed');
+      tracker.lastVisited = Date.now();
     }
   }
 
@@ -129,33 +199,10 @@ export class DomainStatsTracker {
         timeMetrics: tracker.timeTracker.getCurrentMetrics(),
         lastVisited: tracker.lastVisited,
       });
-      console.log(`[DomainStatsTracker] ${domain}: ${scrollMetrics.distancePixels}px`);
     });
 
-    return stats;
-  }
-
-  // Get current domain
-  getCurrentDomain(): string | null {
-    return this.currentDomain;
-  }
-
-  // Log current metrics
-  logCurrentMetrics(): void {
-    if (!this.currentDomain) {
-      console.log('[DomainStatsTracker] No active domain');
-      return;
-    }
-
-    const tracker = this.domainStats.get(this.currentDomain);
-    if (!tracker) return;
-
-    console.log(`\n====== Stats for ${this.currentDomain} ======`);
-    tracker.scrollTracker.logMetrics(this.currentDomain);
-    tracker.timeTracker.logMetrics();
-    console.log('==================================================\n');
+    return stats.sort((a, b) => b.lastVisited - a.lastVisited);
   }
 }
 
 export default DomainStatsTracker;
-

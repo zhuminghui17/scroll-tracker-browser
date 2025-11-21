@@ -15,12 +15,17 @@ export class TimeTracker {
   private pauseStartTime: number = 0;
   private totalPausedTime: number = 0; // Total time spent paused
   
+  // Accumulated time from previous sessions
+  private previousTotalTime: number = 0;
+  
   // Configuration
   private readonly SCROLL_TIMEOUT = 500; // ms - time after last scroll to end session
   private readonly MIN_DELTA = 2; // minimum deltaY to consider as active scroll
 
-  constructor() {
+  constructor(initialScrollingTime: number = 0, initialTotalTime: number = 0) {
     this.sessionStartTime = Date.now();
+    this.scrollingTime = initialScrollingTime;
+    this.previousTotalTime = initialTotalTime;
   }
 
   // Process a scroll event
@@ -124,12 +129,14 @@ export class TimeTracker {
   // Get current time metrics
   getCurrentMetrics(): TimeMetrics {
     const now = Date.now();
-    let totalTime = now - this.sessionStartTime - this.totalPausedTime;
+    let currentSessionTime = now - this.sessionStartTime - this.totalPausedTime;
     
     // If currently paused, subtract the current pause duration
     if (this.isPaused && this.pauseStartTime > 0) {
-      totalTime -= (now - this.pauseStartTime);
+      currentSessionTime -= (now - this.pauseStartTime);
     }
+    
+    const totalTime = this.previousTotalTime + currentSessionTime;
     
     const metrics = {
       scrollingTime: this.scrollingTime,

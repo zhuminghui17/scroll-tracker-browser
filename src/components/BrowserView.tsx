@@ -161,7 +161,7 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
   bookmarks = [],
 }, ref) {
   const webViewRef = useRef<WebView>(null);
-  const statsTrackerRef = useRef(new DomainStatsTracker());
+  const statsTrackerRef = useRef(DomainStatsTracker.getInstance());
   const currentUrlRef = useRef(initialUrl);
   const [showNewTab, setShowNewTab] = useState(initialUrl === 'about:newtab');
 
@@ -199,22 +199,22 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
       return statsTrackerRef.current.getAllStats();
     },
     pause: () => {
-      statsTrackerRef.current.pause();
+      statsTrackerRef.current.pause(currentUrlRef.current, tabId);
     },
     resume: () => {
-      statsTrackerRef.current.resume();
+      statsTrackerRef.current.resume(currentUrlRef.current, tabId);
     },
   }));
 
   useEffect(() => {
     // Initialize tracking for initial URL (skip for new tab page)
     if (initialUrl !== 'about:newtab') {
-      statsTrackerRef.current.switchDomain(initialUrl);
+      statsTrackerRef.current.resume(initialUrl, tabId);
     }
 
     // Cleanup on unmount
     return () => {
-      statsTrackerRef.current.pause();
+      statsTrackerRef.current.pause(currentUrlRef.current, tabId);
       console.log(`[BrowserView] Tab ${tabId} unmounted, tracking paused`);
     };
   }, [initialUrl, tabId]);
@@ -231,7 +231,7 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
     }
     
     // Start tracking
-    statsTrackerRef.current.switchDomain(url);
+    statsTrackerRef.current.resume(url, tabId);
   };
 
   // Handle messages from WebView
@@ -251,6 +251,7 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
           }
           
           statsTracker.processScrollEvent(
+            data.url,
             data.scrollY,
             data.deltaY,
             data.timestamp
@@ -258,22 +259,30 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
           
           // Log metrics periodically
           if (Math.random() < 0.05) {
-            statsTracker.logCurrentMetrics();
+            // statsTracker.logCurrentMetrics();
           }
           break;
 
         case 'touch':
-          statsTracker.processTouchEvent(data.action, data.timestamp);
+          // We need URL for touch event, but JS might not send it in 'touch' event type
+          // Let's assume the JS injection updates to include url, or we use currentUrlRef
+          statsTracker.processTouchEvent(currentUrlRef.current, data.action, data.timestamp);
           break;
 
         case 'page_load':
           console.log(`[BrowserView] Page loaded: ${data.url}`);
-          statsTracker.switchDomain(data.url);
+          if (currentUrlRef.current !== data.url) {
+             statsTracker.pause(currentUrlRef.current, tabId);
+          }
+          statsTracker.resume(data.url, tabId);
+          currentUrlRef.current = data.url;
           break;
 
         case 'url_change':
           console.log(`[BrowserView] URL changed: ${data.oldUrl} -> ${data.newUrl}`);
-          statsTracker.switchDomain(data.newUrl);
+          statsTracker.pause(data.oldUrl, tabId);
+          statsTracker.resume(data.newUrl, tabId);
+          currentUrlRef.current = data.newUrl;
           break;
 
         default:
@@ -287,9 +296,10 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
   // Handle navigation state changes
   const handleNavigationStateChange = (navState: any) => {
     if (navState.url && navState.url !== currentUrlRef.current && navState.url !== 'about:blank') {
+      statsTrackerRef.current.pause(currentUrlRef.current, tabId);
       currentUrlRef.current = navState.url;
       setShowNewTab(false);
-      statsTrackerRef.current.switchDomain(navState.url);
+      statsTrackerRef.current.resume(navState.url, tabId);
       onUrlChange?.(navState.url);
     }
 
