@@ -1,10 +1,17 @@
 // DomainStatsTracker: Global stats tracking service
 
 import { AppState, AppStateStatus } from 'react-native';
-import { DomainStats, ScrollMetrics, TimeMetrics } from '../types/tracking';
+import { DomainStats, ScrollMetrics, TimeMetrics, SessionLog } from '../types/tracking';
 import ScrollTracker from './ScrollTracker';
 import TimeTracker from './TimeTracker';
 import BrowserStorage from '../storage/BrowserStorage';
+
+interface SessionState {
+  startTime: number;
+  startScroll: number;
+  startScrollTime: number;
+  startTotalTime: number;
+}
 
 export class DomainStatsTracker {
   private static instance: DomainStatsTracker;
@@ -18,6 +25,10 @@ export class DomainStatsTracker {
   // Track active tabs per domain to handle multiple tabs on same domain
   private activeTabsByDomain: Map<string, Set<string>> = new Map();
   
+  // Track active sessions for logging
+  private activeSessions: Map<string, SessionState> = new Map();
+  private sessionLogs: SessionLog[] = [];
+
   private saveInterval: NodeJS.Timeout | null = null;
   private isBackgrounded: boolean = false;
 
@@ -42,13 +53,10 @@ export class DomainStatsTracker {
   private handleAppStateChange = (nextAppState: AppStateStatus) => {
     if (nextAppState === 'background' || nextAppState === 'inactive') {
       if (!this.isBackgrounded) {
-        // Pause all currently active trackers
+        // Pause all currently active trackers and end sessions
         this.activeTabsByDomain.forEach((tabs, domain) => {
           if (tabs.size > 0) {
-            const tracker = this.domainStats.get(domain);
-            if (tracker) {
-              tracker.timeTracker.pause();
-            }
+            this.pauseDomainTracking(domain);
           }
         });
         this.isBackgrounded = true;
@@ -57,13 +65,10 @@ export class DomainStatsTracker {
       }
     } else if (nextAppState === 'active') {
       if (this.isBackgrounded) {
-        // Resume all previously active trackers
+        // Resume all previously active trackers and start sessions
         this.activeTabsByDomain.forEach((tabs, domain) => {
           if (tabs.size > 0) {
-            const tracker = this.domainStats.get(domain);
-            if (tracker) {
-              tracker.timeTracker.resume();
-            }
+             this.resumeDomainTracking(domain);
           }
         });
         this.isBackgrounded = false;
@@ -73,6 +78,7 @@ export class DomainStatsTracker {
   };
 
   private async initialize() {
+    // Load aggregated stats
     const stats = await BrowserStorage.loadStats();
     if (stats && Array.isArray(stats)) {
       stats.forEach((stat: any) => {
@@ -91,12 +97,22 @@ export class DomainStatsTracker {
       });
       console.log(`[DomainStatsTracker] Initialized with ${this.domainStats.size} domains`);
     }
+
+    // Load session logs
+    const logs = await BrowserStorage.loadSessionLogs();
+    if (logs && Array.isArray(logs)) {
+      this.sessionLogs = logs;
+      console.log(`[DomainStatsTracker] Initialized with ${this.sessionLogs.length} session logs`);
+    }
   }
 
   async save() {
      const stats = this.getAllStats();
      if (stats.length > 0) {
        await BrowserStorage.saveStats(stats);
+     }
+     if (this.sessionLogs.length > 0) {
+       await BrowserStorage.saveSessionLogs(this.sessionLogs);
      }
   }
 
@@ -123,6 +139,75 @@ export class DomainStatsTracker {
       });
     }
     return this.domainStats.get(domain)!;
+  }
+
+  // Start a session log for a domain
+  private startSessionLog(domain: string) {
+    const tracker = this.getOrCreateTracker(domain);
+    const scrollMetrics = tracker.scrollTracker.getCurrentMetrics();
+    const timeMetrics = tracker.timeTracker.getCurrentMetrics();
+
+    this.activeSessions.set(domain, {
+      startTime: Date.now(),
+      startScroll: scrollMetrics.distancePixels,
+      startScrollTime: timeMetrics.scrollingTime,
+      startTotalTime: timeMetrics.totalTime,
+    });
+    console.log(`[DomainStatsTracker] Started session log for ${domain}`);
+  }
+
+  // End a session log for a domain
+  private endSessionLog(domain: string) {
+    const sessionStart = this.activeSessions.get(domain);
+    if (!sessionStart) return;
+
+    const tracker = this.domainStats.get(domain);
+    if (!tracker) return;
+
+    const scrollMetrics = tracker.scrollTracker.getCurrentMetrics();
+    const timeMetrics = tracker.timeTracker.getCurrentMetrics();
+    const endTime = Date.now();
+
+    const log: SessionLog = {
+      domain,
+      startTime: new Date(sessionStart.startTime).toISOString(),
+      endTime: new Date(endTime).toISOString(),
+      scrollDistance: scrollMetrics.distancePixels - sessionStart.startScroll,
+      scrollTime: timeMetrics.scrollingTime - sessionStart.startScrollTime,
+      totalTime: timeMetrics.totalTime - sessionStart.startTotalTime,
+    };
+
+    // Only save logs with significant activity:
+    // 1. Must have scrolled at least 10 pixels
+    // 2. OR stayed on page for at least 5 seconds
+    if (log.scrollDistance > 10 || log.totalTime > 5000) {
+      this.sessionLogs.push(log);
+      // Limit logs size (keep last 10000)
+      if (this.sessionLogs.length > 10000) {
+        this.sessionLogs = this.sessionLogs.slice(-10000);
+      }
+      console.log(`[DomainStatsTracker] Logged session for ${domain}: ${log.totalTime}ms, ${log.scrollDistance}px`);
+    } else {
+      console.log(`[DomainStatsTracker] Ignored insignificant session for ${domain}: ${log.totalTime}ms, ${log.scrollDistance}px`);
+    }
+
+    this.activeSessions.delete(domain);
+  }
+
+  private pauseDomainTracking(domain: string) {
+    const tracker = this.domainStats.get(domain);
+    if (tracker) {
+      tracker.timeTracker.pause();
+      this.endSessionLog(domain);
+      this.save(); // Save on pause
+    }
+  }
+
+  private resumeDomainTracking(domain: string) {
+    const tracker = this.getOrCreateTracker(domain);
+    tracker.timeTracker.resume();
+    tracker.lastVisited = Date.now();
+    this.startSessionLog(domain);
   }
 
   // Process scroll event
@@ -159,11 +244,7 @@ export class DomainStatsTracker {
     // Only pause the tracker if NO tabs are active for this domain
     // AND app is not already backgrounded (if backgrounded, it's already paused)
     if (activeTabs.size === 0 && !this.isBackgrounded) {
-      const tracker = this.domainStats.get(domain);
-      if (tracker) {
-        tracker.timeTracker.pause();
-        this.save(); // Save on pause
-      }
+      this.pauseDomainTracking(domain);
     }
   }
 
@@ -181,9 +262,14 @@ export class DomainStatsTracker {
     // Ensure tracker is resumed
     // Only if app is not backgrounded
     if (!this.isBackgrounded) {
-      const tracker = this.getOrCreateTracker(domain);
-      tracker.timeTracker.resume();
-      tracker.lastVisited = Date.now();
+      // Check if session already active (could happen if multiple tabs)
+      if (!this.activeSessions.has(domain)) {
+         this.resumeDomainTracking(domain);
+      } else {
+         // Just update last visited
+         const tracker = this.getOrCreateTracker(domain);
+         tracker.lastVisited = Date.now();
+      }
     }
   }
 
@@ -202,6 +288,38 @@ export class DomainStatsTracker {
     });
 
     return stats.sort((a, b) => b.lastVisited - a.lastVisited);
+  }
+
+  // Get all session logs
+  getSessionLogs(): SessionLog[] {
+    return [...this.sessionLogs].sort((a, b) => 
+      new Date(b.endTime).getTime() - new Date(a.endTime).getTime()
+    );
+  }
+
+  // Export logs as CSV string
+  exportLogsCSV(): string {
+    const header = 'domain,start_timestamp,end_timestamp,scroll_distance_pixels,scroll_time_ms,total_time_ms';
+    const rows = this.sessionLogs.map(log => 
+      `${log.domain},${log.startTime},${log.endTime},${Math.round(log.scrollDistance)},${Math.round(log.scrollTime)},${Math.round(log.totalTime)}`
+    );
+    
+    return [header, ...rows].join('\n');
+  }
+
+  // Clear logs and stats
+  async clearAllData(): Promise<void> {
+    this.sessionLogs = [];
+    this.domainStats.clear();
+    this.activeSessions.clear();
+    this.activeTabsByDomain.clear();
+    
+    // Clear storage
+    await BrowserStorage.clearAll();
+    
+    // Re-initialize empty state
+    await this.save();
+    console.log('[DomainStatsTracker] All data cleared');
   }
 }
 
