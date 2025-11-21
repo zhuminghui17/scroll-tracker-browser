@@ -9,9 +9,11 @@ import {
   StyleSheet,
   Modal,
   Dimensions,
-  Share,
   Alert,
+  Platform,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { DomainStats, SessionLog } from '../types/tracking';
 import DomainStatsTracker from '../trackers/DomainStatsTracker';
 import {
@@ -72,15 +74,41 @@ const ScrollStatsView: React.FC<ScrollStatsViewProps> = ({
   const handleExport = async () => {
     try {
       const csv = DomainStatsTracker.getInstance().exportLogsCSV();
-      const result = await Share.share({
-        message: csv,
-        title: 'scroll_tracker_logs.csv',
-      });
       
-      if (result.action === Share.sharedAction) {
-        console.log('CSV Shared successfully');
+      if (sessionLogs.length === 0) {
+        Alert.alert('No Data', 'There are no session logs to export.');
+        return;
       }
+
+      // Generate filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+      const filename = `scroll_logs_${timestamp}.csv`;
+      
+      // Create file in cache directory using new expo-file-system API
+      const file = new FileSystem.File(FileSystem.Paths.cache, filename);
+      
+      // Write CSV content
+      await file.write(csv);
+
+      console.log('[ScrollStatsView] CSV file created:', file.uri);
+
+      // Check if sharing is available
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (!isAvailable) {
+        Alert.alert('Error', 'Sharing is not available on this device');
+        return;
+      }
+
+      // Share the file
+      await Sharing.shareAsync(file.uri, {
+        mimeType: 'text/csv',
+        dialogTitle: 'Export Scroll Logs',
+        UTI: 'public.comma-separated-values-text',
+      });
+
+      console.log('[ScrollStatsView] CSV file shared successfully');
     } catch (error: any) {
+      console.error('[ScrollStatsView] Export error:', error);
       Alert.alert('Error', 'Could not export logs: ' + error.message);
     }
   };
