@@ -2,17 +2,15 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   Modal,
   SafeAreaView,
-  Alert,
   ActivityIndicator,
-  ScrollView,
 } from 'react-native';
-import * as Network from 'expo-network';
 import { getGatewayUrl, setGatewayUrl } from '../config/gateway';
+
+const RELAY_URL = 'https://infinite-scroll-relay-production.up.railway.app';
 
 interface GatewaySettingsViewProps {
   visible: boolean;
@@ -25,42 +23,26 @@ const GatewaySettingsView: React.FC<GatewaySettingsViewProps> = ({
   onClose,
   onSave,
 }) => {
-  const [url, setUrl] = useState('');
   const [testing, setTesting] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [deviceIp, setDeviceIp] = useState<string | null>(null);
-  const [loadingIp, setLoadingIp] = useState(false);
+  const [status, setStatus] = useState<'idle' | 'checking' | 'connected' | 'no_printer' | 'error'>('idle');
+  const [printerConnected, setPrinterConnected] = useState(false);
 
   useEffect(() => {
     if (visible) {
-      getGatewayUrl().then(setUrl);
       setStatus('idle');
-      fetchDeviceIp();
+      checkConnection();
     }
   }, [visible]);
 
-  const fetchDeviceIp = async () => {
-    setLoadingIp(true);
-    try {
-      const ip = await Network.getIpAddressAsync();
-      setDeviceIp(ip);
-    } catch (err) {
-      console.warn('[GatewaySettings] Failed to get IP:', err);
-      setDeviceIp(null);
-    } finally {
-      setLoadingIp(false);
-    }
-  };
-
-  const testConnection = async () => {
+  const checkConnection = async () => {
     setTesting(true);
-    setStatus('idle');
+    setStatus('checking');
     
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
+      const timeout = setTimeout(() => controller.abort(), 10000);
       
-      const response = await fetch(`${url}/health`, {
+      const response = await fetch(`${RELAY_URL}/health`, {
         method: 'GET',
         signal: controller.signal,
       });
@@ -68,7 +50,9 @@ const GatewaySettingsView: React.FC<GatewaySettingsViewProps> = ({
       clearTimeout(timeout);
       
       if (response.ok) {
-        setStatus('success');
+        const data = await response.json();
+        setPrinterConnected(data.printerConnected === true);
+        setStatus(data.printerConnected ? 'connected' : 'no_printer');
       } else {
         setStatus('error');
       }
@@ -79,143 +63,82 @@ const GatewaySettingsView: React.FC<GatewaySettingsViewProps> = ({
     }
   };
 
-  const handleSave = async () => {
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      Alert.alert('Invalid URL', 'URL must start with http:// or https://');
-      return;
-    }
-    
-    await setGatewayUrl(url);
-    onSave(url);
+  const handleUseRelay = async () => {
+    await setGatewayUrl(RELAY_URL);
+    onSave(RELAY_URL);
     onClose();
-    Alert.alert('Saved', 'Gateway URL has been updated.');
   };
 
-  const useDeviceIpAsGateway = () => {
-    if (deviceIp) {
-      setUrl(`http://${deviceIp}:3000`);
+  const getStatusColor = () => {
+    switch (status) {
+      case 'connected': return '#34C759';
+      case 'no_printer': return '#FF9500';
+      case 'error': return '#FF3B30';
+      default: return '#666';
     }
   };
 
-  const getNetworkPrefix = (ip: string): string => {
-    const parts = ip.split('.');
-    if (parts.length === 4) {
-      return `${parts[0]}.${parts[1]}.${parts[2]}`;
+  const getStatusText = () => {
+    switch (status) {
+      case 'checking': return 'Checking...';
+      case 'connected': return 'Relay Connected, Printer Online';
+      case 'no_printer': return 'Relay Connected, Printer Offline';
+      case 'error': return 'Cannot reach relay server';
+      default: return '';
     }
-    return ip;
   };
-
-  const presets = [
-    { label: 'Localhost (Simulator)', url: 'http://127.0.0.1:3000' },
-    { label: 'Printer Direct (Ethernet)', url: 'http://192.168.123.100:3000' },
-  ];
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose}>
-            <Text style={styles.cancelButton}>Cancel</Text>
+            <Text style={styles.cancelButton}>Close</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>Gateway Settings</Text>
-          <TouchableOpacity onPress={handleSave}>
-            <Text style={styles.saveButton}>Save</Text>
-          </TouchableOpacity>
+          <Text style={styles.title}>Connection</Text>
+          <View style={{ width: 50 }} />
         </View>
 
-        <ScrollView style={styles.scrollContent}>
-          <View style={styles.content}>
-            {/* Device IP Section */}
-            <View style={styles.ipSection}>
-              <Text style={styles.label}>This Device's IP</Text>
-              <View style={styles.ipRow}>
-                {loadingIp ? (
-                  <ActivityIndicator size="small" color="#007AFF" />
-                ) : deviceIp ? (
-                  <>
-                    <Text style={styles.ipText}>{deviceIp}</Text>
-                    <Text style={styles.networkHint}>
-                      Network: {getNetworkPrefix(deviceIp)}.x
-                    </Text>
-                  </>
-                ) : (
-                  <Text style={styles.ipError}>Unable to get IP</Text>
-                )}
-                <TouchableOpacity style={styles.refreshButton} onPress={fetchDeviceIp}>
-                  <Text style={styles.refreshButtonText}>↻</Text>
-                </TouchableOpacity>
-              </View>
-              {deviceIp && (
-                <Text style={styles.ipHint}>
-                  Your Mac must be on the same network ({getNetworkPrefix(deviceIp)}.x) for the gateway to work.
-                </Text>
+        <View style={styles.content}>
+          <View style={styles.statusCard}>
+            <Text style={styles.label}>Cloud Relay Server</Text>
+            <Text style={styles.urlText}>{RELAY_URL}</Text>
+            
+            <View style={styles.statusRow}>
+              {testing ? (
+                <ActivityIndicator size="small" color="#007AFF" />
+              ) : (
+                <View style={[styles.statusDot, { backgroundColor: getStatusColor() }]} />
               )}
+              <Text style={[styles.statusText, { color: getStatusColor() }]}>
+                {getStatusText()}
+              </Text>
             </View>
 
-            <Text style={styles.label}>Gateway URL</Text>
-            <TextInput
-              style={styles.input}
-              value={url}
-              onChangeText={setUrl}
-              placeholder="http://192.168.1.100:3000"
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-            />
-
-            <View style={styles.testRow}>
-              <TouchableOpacity
-                style={styles.testButton}
-                onPress={testConnection}
-                disabled={testing}
-              >
-                {testing ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.testButtonText}>Test Connection</Text>
-                )}
-              </TouchableOpacity>
-              
-              {status === 'success' && (
-                <Text style={styles.statusSuccess}>✓ Connected</Text>
-              )}
-              {status === 'error' && (
-                <Text style={styles.statusError}>✗ Failed</Text>
-              )}
-            </View>
-
-            {/* Use This Device as Gateway */}
-            {deviceIp && (
-              <>
-                <Text style={styles.sectionTitle}>Use This Device</Text>
-                <TouchableOpacity
-                  style={styles.presetButton}
-                  onPress={useDeviceIpAsGateway}
-                >
-                  <Text style={styles.presetLabel}>This iPhone ({deviceIp})</Text>
-                  <Text style={styles.presetUrl}>http://{deviceIp}:3000</Text>
-                </TouchableOpacity>
-              </>
-            )}
-
-            <Text style={styles.sectionTitle}>Quick Presets</Text>
-            {presets.map((preset, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.presetButton}
-                onPress={() => setUrl(preset.url)}
-              >
-                <Text style={styles.presetLabel}>{preset.label}</Text>
-                <Text style={styles.presetUrl}>{preset.url}</Text>
-              </TouchableOpacity>
-            ))}
-
-            <Text style={styles.hint}>
-              The gateway server runs on your Mac. Find its IP in System Settings → Wi-Fi → Details, 
-              or run `ifconfig | grep inet` in Terminal. Make sure both devices are on the same network.
-            </Text>
+            <TouchableOpacity
+              style={styles.refreshButton}
+              onPress={checkConnection}
+              disabled={testing}
+            >
+              <Text style={styles.refreshButtonText}>↻ Refresh</Text>
+            </TouchableOpacity>
           </View>
-        </ScrollView>
+
+          {status === 'no_printer' && (
+            <View style={styles.hintCard}>
+              <Text style={styles.hintTitle}>Printer Not Connected</Text>
+              <Text style={styles.hintText}>
+                Make sure the printer is turned on and connected, and the gateway is running on the Mac/Pi.
+              </Text>
+            </View>
+          )}
+
+          {status === 'connected' && (
+            <TouchableOpacity style={styles.useButton} onPress={handleUseRelay}>
+              <Text style={styles.useButtonText}>Use This Connection</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </SafeAreaView>
     </Modal>
   );
@@ -243,133 +166,92 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: '#007AFF',
   },
-  saveButton: {
-    fontSize: 17,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  scrollContent: {
-    flex: 1,
-  },
   content: {
     padding: 16,
   },
-  ipSection: {
+  statusCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#ddd',
-  },
-  ipRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  ipText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  networkHint: {
-    fontSize: 14,
-    color: '#666',
-  },
-  ipError: {
-    fontSize: 16,
-    color: '#FF3B30',
-  },
-  ipHint: {
-    marginTop: 8,
-    fontSize: 13,
-    color: '#888',
-  },
-  refreshButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 'auto',
-  },
-  refreshButtonText: {
-    fontSize: 18,
-    color: '#007AFF',
   },
   label: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#666',
-    marginBottom: 8,
     textTransform: 'uppercase',
+    marginBottom: 4,
   },
-  input: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#ddd',
+  urlText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 16,
   },
-  testRow: {
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
-    gap: 12,
+    gap: 8,
+    marginBottom: 16,
   },
-  testButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    minWidth: 140,
-    alignItems: 'center',
+  statusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
-  testButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  statusSuccess: {
-    color: '#34C759',
-    fontWeight: '600',
-  },
-  statusError: {
-    color: '#FF3B30',
-    fontWeight: '600',
-  },
-  sectionTitle: {
+  statusText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-    marginTop: 24,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
-  presetButton: {
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  presetLabel: {
-    fontSize: 16,
     fontWeight: '500',
   },
-  presetUrl: {
+  refreshButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 6,
+  },
+  refreshButtonText: {
+    fontSize: 14,
+    color: '#007AFF',
+  },
+  hintCard: {
+    backgroundColor: '#FFF9E6',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#FFE082',
+  },
+  hintTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F57C00',
+    marginBottom: 8,
+  },
+  hintText: {
     fontSize: 14,
     color: '#666',
-    marginTop: 4,
+    marginBottom: 8,
   },
-  hint: {
-    marginTop: 24,
-    fontSize: 13,
-    color: '#888',
-    lineHeight: 18,
+  codeText: {
+    fontFamily: 'Courier',
+    fontSize: 12,
+    backgroundColor: '#fff',
+    padding: 8,
+    borderRadius: 4,
+    color: '#333',
+  },
+  useButton: {
+    backgroundColor: '#34C759',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  useButtonText: {
+    color: '#fff',
+    fontSize: 17,
+    fontWeight: '600',
   },
 });
 

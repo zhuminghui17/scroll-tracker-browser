@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const GATEWAY_URL_KEY = '@gateway_url';
-const DEFAULT_GATEWAY_URL = 'http://192.168.123.100:3000';
+const DEFAULT_GATEWAY_URL = 'https://infinite-scroll-relay-production.up.railway.app';
 
 let cachedGatewayUrl: string | null = null;
 
