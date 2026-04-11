@@ -83,6 +83,14 @@ class GatewayReporter {
   hasActiveSession(): boolean {
     return this.signalCount > 0;
   }
+
+  private static instance: GatewayReporter | null = null;
+  static getInstance(): GatewayReporter {
+    if (!GatewayReporter.instance) {
+      GatewayReporter.instance = new GatewayReporter();
+    }
+    return GatewayReporter.instance;
+  }
 }
 
 // JavaScript code to inject into the WebView for tracking
@@ -281,7 +289,7 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
 }, ref) {
   const webViewRef = useRef<WebView>(null);
   const statsTrackerRef = useRef(DomainStatsTracker.getInstance());
-  const gatewayRef = useRef(new GatewayReporter());
+  const gatewayRef = useRef(GatewayReporter.getInstance());
   const currentUrlRef = useRef(initialUrl);
   const [showNewTab, setShowNewTab] = useState(initialUrl === 'about:newtab');
 
