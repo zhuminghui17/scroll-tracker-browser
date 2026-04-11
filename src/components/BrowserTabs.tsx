@@ -8,12 +8,14 @@ import TabListView from './TabListView';
 import BookmarksView from './BookmarksView';
 import ScrollStatsView from './ScrollStatsView';
 import DeviceSelectionView from './DeviceSelectionView';
+import GatewaySettingsView from './GatewaySettingsView';
 import { Tab, HistoryEntry, Bookmark } from '../types/browser';
 import { DomainStats } from '../types/tracking';
 import DomainStatsTracker from '../trackers/DomainStatsTracker';
 import BrowserStorage from '../storage/BrowserStorage';
 import { DEFAULT_BOOKMARKS } from '../constants/bookmarks';
 import { DeviceConfig } from '../utils/DeviceConfig';
+import { initGatewayConfig } from '../config/gateway';
 
 const DEFAULT_URL = 'about:newtab';
 
@@ -26,6 +28,7 @@ const BrowserTabs: React.FC = () => {
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showDeviceSelection, setShowDeviceSelection] = useState(false);
+  const [showGatewaySettings, setShowGatewaySettings] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentStats, setCurrentStats] = useState<DomainStats[]>([]);
   const [currentDevice, setCurrentDevice] = useState<string>('Default iPhone');
@@ -373,6 +376,37 @@ const BrowserTabs: React.FC = () => {
     );
   }, [refreshStats]);
 
+  const handleEndSession = useCallback(async () => {
+    const activeRef = tabRefs.current.get(activeTabId);
+    if (!activeRef) return;
+
+    if (!activeRef.hasActiveSession()) {
+      Alert.alert('No Active Session', 'There is no active print session to end.');
+      return;
+    }
+
+    try {
+      await activeRef.endSession();
+      Alert.alert('Session Ended', 'Print session has been ended and receipt printed.');
+    } catch (err) {
+      console.error('[BrowserTabs] End session failed:', err);
+      Alert.alert('Error', 'Failed to end session.');
+    }
+  }, [activeTabId]);
+
+  const handleShowGatewaySettings = () => {
+    setShowGatewaySettings(true);
+  };
+
+  const handleGatewaySave = (_url: string) => {
+    console.log('[BrowserTabs] Gateway URL updated');
+  };
+
+  // Initialize gateway config
+  useEffect(() => {
+    initGatewayConfig();
+  }, []);
+
   // Initialize device config
   useEffect(() => {
     const initDevice = async () => {
@@ -434,6 +468,8 @@ const BrowserTabs: React.FC = () => {
         onShowStats={handleShowStats}
         onShowDeviceSelection={handleShowDeviceSelection}
         onResetStats={handleResetStats}
+        onEndSession={handleEndSession}
+        onShowGatewaySettings={handleShowGatewaySettings}
       />
 
       {/* WebView for each tab (only active one is visible) */}
@@ -515,6 +551,13 @@ const BrowserTabs: React.FC = () => {
         currentDevice={currentDevice}
         onClose={() => setShowDeviceSelection(false)}
         onSelectDevice={handleSelectDevice}
+      />
+
+      {/* Gateway Settings View */}
+      <GatewaySettingsView
+        visible={showGatewaySettings}
+        onClose={() => setShowGatewaySettings(false)}
+        onSave={handleGatewaySave}
       />
     </View>
   );

@@ -6,11 +6,14 @@ import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import DomainStatsTracker from '../trackers/DomainStatsTracker';
 import NewTabPage from './NewTabPage';
 import { Bookmark } from '../types/browser';
-import { GATEWAY_URL, SCROLL_DEBOUNCE_MS } from '../config/gateway';
+import { getGatewayUrlSync, SCROLL_DEBOUNCE_MS } from '../config/gateway';
 
 class GatewayReporter {
   private pendingDelta = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private totalDistance = 0;
+  private signalCount = 0;
+  private startedAt: number | null = null;
 
   queue(deltaY: number): void {
     this.pendingDelta += deltaY;
@@ -25,10 +28,20 @@ class GatewayReporter {
     this.pendingDelta = 0;
     if (delta === 0) return;
 
-    fetch(`${GATEWAY_URL}/scroll`, {
+    if (this.startedAt === null) {
+      this.startedAt = Date.now();
+    }
+    this.totalDistance += Math.abs(delta);
+    this.signalCount += 1;
+
+    const gatewayUrl = getGatewayUrlSync();
+    fetch(`${gatewayUrl}/scroll`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deltaY: delta }),
+      body: JSON.stringify({
+        deltaY: delta,
+        signalCount: this.signalCount,
+      }),
     }).catch(err => console.warn('[GatewayReporter] send failed:', err));
   }
 
@@ -38,6 +51,37 @@ class GatewayReporter {
       this.timer = null;
     }
     this.flush();
+  }
+
+  endSession(): Promise<void> {
+    this.stop();
+    if (this.signalCount === 0 || this.startedAt === null) {
+      return Promise.resolve();
+    }
+
+    const durationMs = Date.now() - this.startedAt;
+    const payload = {
+      totalDistance: this.totalDistance,
+      signalCount: this.signalCount,
+      durationMs,
+    };
+
+    this.totalDistance = 0;
+    this.signalCount = 0;
+    this.startedAt = null;
+
+    const gatewayUrl = getGatewayUrlSync();
+    return fetch(`${gatewayUrl}/session/end`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then(() => console.log('[GatewayReporter] session ended'))
+      .catch(err => console.warn('[GatewayReporter] end session failed:', err));
+  }
+
+  hasActiveSession(): boolean {
+    return this.signalCount > 0;
   }
 }
 
@@ -214,6 +258,8 @@ export interface BrowserViewRef {
   getStats: () => any[];
   pause: () => void;
   resume: () => void;
+  endSession: () => Promise<void>;
+  hasActiveSession: () => boolean;
 }
 
 interface BrowserViewProps {
@@ -277,6 +323,12 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
     },
     resume: () => {
       statsTrackerRef.current.resume(currentUrlRef.current, tabId);
+    },
+    endSession: () => {
+      return gatewayRef.current.endSession();
+    },
+    hasActiveSession: () => {
+      return gatewayRef.current.hasActiveSession();
     },
   }));
 

@@ -1,5 +1,33 @@
-// Gateway server URL — update this to your Mac's LAN IP when running on-device.
-// When running on the same machine (simulator), 127.0.0.1 works.
-export const GATEWAY_URL = 'http://10.102.103.115:3000';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const GATEWAY_URL_KEY = '@gateway_url';
+const DEFAULT_GATEWAY_URL = 'http://192.168.123.100:3000';
+
+let cachedGatewayUrl: string | null = null;
+
+export async function getGatewayUrl(): Promise<string> {
+  if (cachedGatewayUrl) return cachedGatewayUrl;
+  
+  try {
+    const stored = await AsyncStorage.getItem(GATEWAY_URL_KEY);
+    cachedGatewayUrl = stored || DEFAULT_GATEWAY_URL;
+    return cachedGatewayUrl;
+  } catch {
+    return DEFAULT_GATEWAY_URL;
+  }
+}
+
+export async function setGatewayUrl(url: string): Promise<void> {
+  cachedGatewayUrl = url;
+  await AsyncStorage.setItem(GATEWAY_URL_KEY, url);
+}
+
+export function getGatewayUrlSync(): string {
+  return cachedGatewayUrl || DEFAULT_GATEWAY_URL;
+}
+
+export async function initGatewayConfig(): Promise<string> {
+  return getGatewayUrl();
+}
 
 export const SCROLL_DEBOUNCE_MS = 300;

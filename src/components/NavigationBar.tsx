@@ -30,6 +30,8 @@ interface NavigationBarProps {
   onShowStats: () => void;
   onShowDeviceSelection: () => void;
   onResetStats: () => void;
+  onEndSession: () => void;
+  onShowGatewaySettings: () => void;
 }
 
 const NavigationBar: React.FC<NavigationBarProps> = ({
@@ -49,6 +51,8 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
   onShowStats,
   onShowDeviceSelection,
   onResetStats,
+  onEndSession,
+  onShowGatewaySettings,
 }) => {
   const [isEditingUrl, setIsEditingUrl] = useState(false);
   const [editedUrl, setEditedUrl] = useState(url);
@@ -98,6 +102,8 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         {
           options: [
             'Cancel',
+            'End Print Session',
+            'Gateway Settings',
             'Add Bookmark',
             'View Bookmarks',
             'View Scroll Stats',
@@ -106,21 +112,25 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
             'Refresh',
             'Cancel',
           ],
-          destructiveButtonIndex: 5,
-          cancelButtonIndex: 7,
+          destructiveButtonIndex: 7,
+          cancelButtonIndex: 9,
         },
         (buttonIndex) => {
           if (buttonIndex === 1) {
-            onAddBookmark();
+            onEndSession();
           } else if (buttonIndex === 2) {
-            onShowBookmarks();
+            onShowGatewaySettings();
           } else if (buttonIndex === 3) {
-            onShowStats();
+            onAddBookmark();
           } else if (buttonIndex === 4) {
-            onShowDeviceSelection();
+            onShowBookmarks();
           } else if (buttonIndex === 5) {
-            onResetStats();
+            onShowStats();
           } else if (buttonIndex === 6) {
+            onShowDeviceSelection();
+          } else if (buttonIndex === 7) {
+            onResetStats();
+          } else if (buttonIndex === 8) {
             onRefresh();
           }
         }
@@ -131,6 +141,8 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         'Menu',
         'Choose an action',
         [
+          { text: 'End Print Session', onPress: onEndSession },
+          { text: 'Gateway Settings', onPress: onShowGatewaySettings },
           { text: 'Add Bookmark', onPress: onAddBookmark },
           { text: 'View Bookmarks', onPress: onShowBookmarks },
           { text: 'View Scroll Stats', onPress: onShowStats },
