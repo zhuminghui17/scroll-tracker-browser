@@ -6,6 +6,40 @@ import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import DomainStatsTracker from '../trackers/DomainStatsTracker';
 import NewTabPage from './NewTabPage';
 import { Bookmark } from '../types/browser';
+import { GATEWAY_URL, SCROLL_DEBOUNCE_MS } from '../config/gateway';
+
+class GatewayReporter {
+  private pendingDelta = 0;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+
+  queue(deltaY: number): void {
+    this.pendingDelta += deltaY;
+    if (!this.timer) {
+      this.timer = setTimeout(() => this.flush(), SCROLL_DEBOUNCE_MS);
+    }
+  }
+
+  flush(): void {
+    this.timer = null;
+    const delta = this.pendingDelta;
+    this.pendingDelta = 0;
+    if (delta === 0) return;
+
+    fetch(`${GATEWAY_URL}/scroll`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deltaY: delta }),
+    }).catch(err => console.warn('[GatewayReporter] send failed:', err));
+  }
+
+  stop(): void {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    this.flush();
+  }
+}
 
 // JavaScript code to inject into the WebView for tracking
 const INJECTED_JAVASCRIPT = `
@@ -201,6 +235,7 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
 }, ref) {
   const webViewRef = useRef<WebView>(null);
   const statsTrackerRef = useRef(DomainStatsTracker.getInstance());
+  const gatewayRef = useRef(new GatewayReporter());
   const currentUrlRef = useRef(initialUrl);
   const [showNewTab, setShowNewTab] = useState(initialUrl === 'about:newtab');
 
@@ -251,9 +286,9 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
       statsTrackerRef.current.resume(initialUrl, tabId);
     }
 
-    // Cleanup on unmount
     return () => {
       statsTrackerRef.current.pause(currentUrlRef.current, tabId);
+      gatewayRef.current.stop();
       console.log(`[BrowserView] Tab ${tabId} unmounted, tracking paused`);
     };
   }, [initialUrl, tabId]);
@@ -285,7 +320,7 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
           break;
 
         case 'scroll':
-          if (Math.random() < 0.05) { // Log 5% of scroll events
+          if (Math.random() < 0.05) {
             console.log(`[BrowserView] Scroll event: deltaY=${data.deltaY}, scrollY=${data.scrollY}`);
           }
           
@@ -295,11 +330,8 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
             data.deltaY,
             data.timestamp
           );
-          
-          // Log metrics periodically
-          if (Math.random() < 0.05) {
-            // statsTracker.logCurrentMetrics();
-          }
+
+          gatewayRef.current.queue(data.deltaY);
           break;
 
         case 'touch':
