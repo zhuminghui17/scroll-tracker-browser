@@ -38,10 +38,7 @@ class GatewayReporter {
     fetch(`${gatewayUrl}/scroll`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        deltaY: delta,
-        signalCount: this.signalCount,
-      }),
+      body: JSON.stringify({ deltaY: delta }),
     }).catch(err => console.warn('[GatewayReporter] send failed:', err));
   }
 
