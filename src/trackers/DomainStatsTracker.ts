@@ -321,6 +321,15 @@ export class DomainStatsTracker {
     return stats.sort((a, b) => b.lastVisited - a.lastVisited);
   }
 
+  /** Sum of distancePixels across domains — same total as ScrollStatsView “Distance”. */
+  getTotalDistancePixels(): number {
+    let sum = 0;
+    this.domainStats.forEach((tracker) => {
+      sum += tracker.scrollTracker.getCurrentMetrics().distancePixels;
+    });
+    return sum;
+  }
+
   // Get all session logs
   getSessionLogs(): SessionLog[] {
     return [...this.sessionLogs].sort((a, b) => 

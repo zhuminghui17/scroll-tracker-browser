@@ -23,6 +23,8 @@ class GatewayReporter {
   }
 
   queue(deltaY: number): void {
+    // Per-event |deltaY| matches ScrollTracker / Scroll Stats (signed batch in flush is for the printer only).
+    this.totalDistance += Math.abs(deltaY);
     this.pendingDelta += deltaY;
     if (!this.timer) {
       this.timer = setTimeout(() => this.flush(), SCROLL_DEBOUNCE_MS);
@@ -38,7 +40,6 @@ class GatewayReporter {
     if (this.startedAt === null) {
       this.startedAt = Date.now();
     }
-    this.totalDistance += Math.abs(delta);
     this.signalCount += 1;
 
     const gatewayUrl = getGatewayUrlSync();
@@ -65,11 +66,14 @@ class GatewayReporter {
 
     const durationMs = Date.now() - this.startedAt;
     const scrollDepthCm = pixelsToCm(this.totalDistance);
+    const accumulatedPx = DomainStatsTracker.getInstance().getTotalDistancePixels();
+    const accumulatedDistanceCm = pixelsToCm(accumulatedPx);
     const payload = {
       totalDistance: this.totalDistance,
       signalCount: this.signalCount,
       durationMs,
       scrollDepthCm,
+      accumulatedDistanceCm,
       scrollTouchCount: this.scrollTouchCount,
     };
 
