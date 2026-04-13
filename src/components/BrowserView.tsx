@@ -7,13 +7,20 @@ import DomainStatsTracker from '../trackers/DomainStatsTracker';
 import NewTabPage from './NewTabPage';
 import { Bookmark } from '../types/browser';
 import { getGatewayUrlSync, SCROLL_DEBOUNCE_MS } from '../config/gateway';
+import { pixelsToCm } from '../utils/formatters';
 
 class GatewayReporter {
   private pendingDelta = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private totalDistance = 0;
   private signalCount = 0;
+  private scrollTouchCount = 0;
   private startedAt: number | null = null;
+
+  recordTouchMove(): void {
+    if (this.startedAt === null) return;
+    this.scrollTouchCount += 1;
+  }
 
   queue(deltaY: number): void {
     this.pendingDelta += deltaY;
@@ -57,14 +64,18 @@ class GatewayReporter {
     }
 
     const durationMs = Date.now() - this.startedAt;
+    const scrollDepthCm = pixelsToCm(this.totalDistance);
     const payload = {
       totalDistance: this.totalDistance,
       signalCount: this.signalCount,
       durationMs,
+      scrollDepthCm,
+      scrollTouchCount: this.scrollTouchCount,
     };
 
     this.totalDistance = 0;
     this.signalCount = 0;
+    this.scrollTouchCount = 0;
     this.startedAt = null;
 
     const gatewayUrl = getGatewayUrlSync();
@@ -395,6 +406,9 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
           // We need URL for touch event, but JS might not send it in 'touch' event type
           // Let's assume the JS injection updates to include url, or we use currentUrlRef
           statsTracker.processTouchEvent(currentUrlRef.current, data.action, data.timestamp);
+          if (data.action === 'move') {
+            gatewayRef.current.recordTouchMove();
+          }
           break;
 
         case 'page_load':
