@@ -1,13 +1,15 @@
 // BrowserView: Full-screen WebView with scroll tracking
 
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Alert } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import DomainStatsTracker from '../trackers/DomainStatsTracker';
 import NewTabPage from './NewTabPage';
 import { Bookmark } from '../types/browser';
 import { getGatewayUrlSync, SCROLL_DEBOUNCE_MS } from '../config/gateway';
-import { pixelsToCm } from '../utils/formatters';
+import { pixelsToCm, pixelsToMeters } from '../utils/formatters';
+
+const BREAK_SCROLL_METERS = 5;
 
 class GatewayReporter {
   private pendingDelta = 0;
@@ -16,6 +18,8 @@ class GatewayReporter {
   private signalCount = 0;
   private scrollTouchCount = 0;
   private startedAt: number | null = null;
+  private breakRecommendedEmitted = false;
+  onBreakRecommended?: () => void;
 
   recordTouchMove(): void {
     if (this.startedAt === null) return;
@@ -26,6 +30,14 @@ class GatewayReporter {
     // Per-event |deltaY| matches ScrollTracker / Scroll Stats (signed batch in flush is for the printer only).
     this.totalDistance += Math.abs(deltaY);
     this.pendingDelta += deltaY;
+    if (
+      !this.breakRecommendedEmitted &&
+      this.onBreakRecommended &&
+      pixelsToMeters(this.totalDistance) >= BREAK_SCROLL_METERS
+    ) {
+      this.breakRecommendedEmitted = true;
+      this.onBreakRecommended();
+    }
     if (!this.timer) {
       this.timer = setTimeout(() => this.flush(), SCROLL_DEBOUNCE_MS);
     }
@@ -81,6 +93,7 @@ class GatewayReporter {
     this.signalCount = 0;
     this.scrollTouchCount = 0;
     this.startedAt = null;
+    this.breakRecommendedEmitted = false;
 
     const gatewayUrl = getGatewayUrlSync();
     return fetch(`${gatewayUrl}/session/end`, {
@@ -358,9 +371,27 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
       statsTrackerRef.current.resume(initialUrl, tabId);
     }
 
+    const gateway = gatewayRef.current;
+    gateway.onBreakRecommended = () => {
+      Alert.alert(
+        'Take a break',
+        `You have scrolled more than ${BREAK_SCROLL_METERS} meters in this session. End the session to print your receipt and rest your eyes.`,
+        [
+          { text: 'Later', style: 'cancel' },
+          {
+            text: 'End session',
+            onPress: () => {
+              void gateway.endSession();
+            },
+          },
+        ],
+      );
+    };
+
     return () => {
       statsTrackerRef.current.pause(currentUrlRef.current, tabId);
       gatewayRef.current.stop();
+      gateway.onBreakRecommended = undefined;
       console.log(`[BrowserView] Tab ${tabId} unmounted, tracking paused`);
     };
   }, [initialUrl, tabId]);
