@@ -8,9 +8,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
 } from 'react-native';
-import { getGatewayUrl, setGatewayUrl } from '../config/gateway';
-
-const RELAY_URL = 'https://infinite-scroll-relay-production.up.railway.app';
+import { setGatewayUrl, DEPLOYED_RELAY_BASE_URL, LOCAL_GATEWAY_URL } from '../config/gateway';
 
 interface GatewaySettingsViewProps {
   visible: boolean;
@@ -42,7 +40,7 @@ const GatewaySettingsView: React.FC<GatewaySettingsViewProps> = ({
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
       
-      const response = await fetch(`${RELAY_URL}/health`, {
+      const response = await fetch(`${DEPLOYED_RELAY_BASE_URL}/health`, {
         method: 'GET',
         signal: controller.signal,
       });
@@ -63,9 +61,15 @@ const GatewaySettingsView: React.FC<GatewaySettingsViewProps> = ({
     }
   };
 
-  const handleUseRelay = async () => {
-    await setGatewayUrl(RELAY_URL);
-    onSave(RELAY_URL);
+  const handleUseDeployedRelay = async () => {
+    await setGatewayUrl(DEPLOYED_RELAY_BASE_URL);
+    onSave(DEPLOYED_RELAY_BASE_URL);
+    onClose();
+  };
+
+  const handleUseLocalGateway = async () => {
+    await setGatewayUrl(LOCAL_GATEWAY_URL);
+    onSave(LOCAL_GATEWAY_URL);
     onClose();
   };
 
@@ -101,8 +105,8 @@ const GatewaySettingsView: React.FC<GatewaySettingsViewProps> = ({
 
         <View style={styles.content}>
           <View style={styles.statusCard}>
-            <Text style={styles.label}>Cloud Relay Server</Text>
-            <Text style={styles.urlText}>{RELAY_URL}</Text>
+            <Text style={styles.label}>Deployed relay (matches gateway RELAY_URL)</Text>
+            <Text style={styles.urlText}>{DEPLOYED_RELAY_BASE_URL}</Text>
             
             <View style={styles.statusRow}>
               {testing ? (
@@ -133,11 +137,14 @@ const GatewaySettingsView: React.FC<GatewaySettingsViewProps> = ({
             </View>
           )}
 
-          {status === 'connected' && (
-            <TouchableOpacity style={styles.useButton} onPress={handleUseRelay}>
-              <Text style={styles.useButtonText}>Use This Connection</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity style={styles.useButton} onPress={handleUseDeployedRelay}>
+            <Text style={styles.useButtonText}>Use deployed relay</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.useLocalButton} onPress={handleUseLocalGateway}>
+            <Text style={styles.useLocalButtonText}>Use local gateway (simulator)</Text>
+            <Text style={styles.useLocalHint}>{LOCAL_GATEWAY_URL}</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     </Modal>
@@ -252,6 +259,26 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 17,
     fontWeight: '600',
+  },
+  useLocalButton: {
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    backgroundColor: '#fff',
+  },
+  useLocalButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  useLocalHint: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    fontFamily: 'Courier',
   },
 });
 
