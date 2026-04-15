@@ -415,9 +415,10 @@ const BrowserTabs: React.FC = () => {
     console.log('[BrowserTabs] Gateway URL updated');
   };
 
-  // Initialize gateway config
   useEffect(() => {
-    initGatewayConfig();
+    void initGatewayConfig().then((url) => {
+      console.log('[BrowserTabs] Gateway HTTP base URL:', url);
+    });
   }, []);
 
   // Initialize device config
