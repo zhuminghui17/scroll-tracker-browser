@@ -13,7 +13,7 @@ import {
   Keyboard,
 } from 'react-native';
 
-const ADMIN_MENU_TRIGGERS = new Set(['shooshoohoohoo']);
+const ADMIN_MENU_TRIGGERS = new Set(['shooshoohoohoo, 0717']);
 
 interface NavigationBarProps {
   url: string;
