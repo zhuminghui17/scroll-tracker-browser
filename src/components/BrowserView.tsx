@@ -13,6 +13,7 @@ const BREAK_SCROLL_METERS = 5;
 
 class GatewayReporter {
   private pendingDelta = 0;
+  private pendingAbsPixels = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private totalDistance = 0;
   private signalCount = 0;
@@ -27,9 +28,9 @@ class GatewayReporter {
   }
 
   queue(deltaY: number): void {
-    // Per-event |deltaY| matches ScrollTracker / Scroll Stats (signed batch in flush is for the printer only).
     this.totalDistance += Math.abs(deltaY);
     this.pendingDelta += deltaY;
+    this.pendingAbsPixels += Math.abs(deltaY);
     if (
       !this.breakRecommendedEmitted &&
       this.onBreakRecommended &&
@@ -46,19 +47,22 @@ class GatewayReporter {
   flush(): void {
     this.timer = null;
     const delta = this.pendingDelta;
+    const absPx = this.pendingAbsPixels;
     this.pendingDelta = 0;
-    if (delta === 0) return;
+    this.pendingAbsPixels = 0;
+    if (absPx === 0) return;
 
     if (this.startedAt === null) {
       this.startedAt = Date.now();
     }
     this.signalCount += 1;
 
+    const deltaCm = pixelsToCm(absPx);
     const gatewayUrl = getGatewayUrlSync();
     fetch(`${gatewayUrl}/scroll`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ deltaY: delta }),
+      body: JSON.stringify({ deltaY: delta, deltaCm }),
     }).catch(err => console.warn('[GatewayReporter] send failed:', err));
   }
 
