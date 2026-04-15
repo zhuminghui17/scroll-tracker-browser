@@ -13,6 +13,8 @@ import {
   Keyboard,
 } from 'react-native';
 
+const ADMIN_MENU_TRIGGERS = new Set(['shooshoohoohoo']);
+
 interface NavigationBarProps {
   url: string;
   canGoBack: boolean;
@@ -24,7 +26,6 @@ interface NavigationBarProps {
   onNavigate: (url: string) => void;
   onShowTabs: () => void;
   onNewTab: () => void;
-  onShowMenu: () => void;
   onAddBookmark: () => void;
   onShowBookmarks: () => void;
   onShowStats: () => void;
@@ -45,7 +46,6 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
   onNavigate,
   onShowTabs,
   onNewTab,
-  onShowMenu,
   onAddBookmark,
   onShowBookmarks,
   onShowStats,
@@ -79,6 +79,20 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
       return;
     }
 
+    const adminKey = finalUrl.toLowerCase().replace(/\s+/g, ' ');
+    const adminCompact = adminKey.replace(/\s/g, '');
+    if (
+      ADMIN_MENU_TRIGGERS.has(adminKey) ||
+      ADMIN_MENU_TRIGGERS.has(adminCompact)
+    ) {
+      Keyboard.dismiss();
+      urlInputRef.current?.blur();
+      setEditedUrl(url);
+      setIsEditingUrl(false);
+      handleMenuPress();
+      return;
+    }
+
     // Check if it's a search query (no dots, or looks like a query)
     const isSearch = !finalUrl.includes('.') || finalUrl.includes(' ');
 
@@ -101,8 +115,6 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
       ActionSheetIOS.showActionSheetWithOptions(
         {
           options: [
-            'Cancel',
-            'End Print Session',
             'Gateway Settings',
             'Add Bookmark',
             'View Bookmarks',
@@ -112,36 +124,32 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
             'Refresh',
             'Cancel',
           ],
-          destructiveButtonIndex: 7,
-          cancelButtonIndex: 9,
+          destructiveButtonIndex: 5,
+          cancelButtonIndex: 7,
         },
         (buttonIndex) => {
-          if (buttonIndex === 1) {
-            onEndSession();
-          } else if (buttonIndex === 2) {
+          if (buttonIndex === 0) {
             onShowGatewaySettings();
-          } else if (buttonIndex === 3) {
+          } else if (buttonIndex === 1) {
             onAddBookmark();
-          } else if (buttonIndex === 4) {
+          } else if (buttonIndex === 2) {
             onShowBookmarks();
-          } else if (buttonIndex === 5) {
+          } else if (buttonIndex === 3) {
             onShowStats();
-          } else if (buttonIndex === 6) {
+          } else if (buttonIndex === 4) {
             onShowDeviceSelection();
-          } else if (buttonIndex === 7) {
+          } else if (buttonIndex === 5) {
             onResetStats();
-          } else if (buttonIndex === 8) {
+          } else if (buttonIndex === 6) {
             onRefresh();
           }
         }
       );
     } else {
-      // For Android, we'll use a simple alert for now
       Alert.alert(
-        'Menu',
+        'Admin',
         'Choose an action',
         [
-          { text: 'End Print Session', onPress: onEndSession },
           { text: 'Gateway Settings', onPress: onShowGatewaySettings },
           { text: 'Add Bookmark', onPress: onAddBookmark },
           { text: 'View Bookmarks', onPress: onShowBookmarks },
@@ -218,9 +226,12 @@ const NavigationBar: React.FC<NavigationBarProps> = ({
         <Text style={styles.buttonText}>+</Text>
       </TouchableOpacity>
 
-      {/* Menu Button */}
-      <TouchableOpacity style={styles.button} onPress={handleMenuPress}>
-        <Text style={styles.buttonText}>⋯</Text>
+      <TouchableOpacity
+        style={[styles.button, styles.endSessionButton]}
+        onPress={onEndSession}
+        accessibilityLabel="End print session"
+      >
+        <Text style={styles.endSessionButtonText}>End</Text>
       </TouchableOpacity>
     </View>
   );
@@ -255,6 +266,15 @@ const styles = StyleSheet.create({
   },
   buttonTextDisabled: {
     color: '#ccc',
+  },
+  endSessionButton: {
+    minWidth: 44,
+    paddingHorizontal: 6,
+  },
+  endSessionButtonText: {
+    fontSize: 14,
+    color: '#C62828',
+    fontWeight: '700',
   },
   urlBarContainer: {
     flex: 1,
