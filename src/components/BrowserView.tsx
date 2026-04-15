@@ -22,15 +22,30 @@ class GatewayReporter {
   private scrollTouchCount = 0;
   private startedAt: number | null = null;
   private breakRecommendedEmitted = false;
+  private touchHasMoved = false;
   onBreakRecommended?: () => void;
   onScrollIdle?: () => void;
 
+  recordTouchStart(): void {
+    this.touchHasMoved = false;
+  }
+
   recordTouchMove(): void {
     if (this.startedAt === null) return;
-    this.scrollTouchCount += 1;
+    if (!this.touchHasMoved) {
+      this.touchHasMoved = true;
+      this.scrollTouchCount += 1;
+    }
+  }
+
+  recordTouchEnd(): void {
+    this.touchHasMoved = false;
   }
 
   queue(deltaY: number): void {
+    if (this.startedAt === null) {
+      this.startedAt = Date.now();
+    }
     this.totalDistance += Math.abs(deltaY);
     this.pendingDelta += deltaY;
     this.pendingAbsPixels += Math.abs(deltaY);
@@ -82,9 +97,6 @@ class GatewayReporter {
     this.pendingAbsPixels = 0;
     if (absPx === 0) return;
 
-    if (this.startedAt === null) {
-      this.startedAt = Date.now();
-    }
     this.signalCount += 1;
 
     const deltaCm = pixelsToCm(absPx);
@@ -121,7 +133,7 @@ class GatewayReporter {
       durationMs,
       scrollDepthCm,
       accumulatedDistanceCm,
-      scrollTouchCount: this.scrollTouchCount,
+      scrollTouchCount: this.scrollTouchCount + 1,
     };
 
     this.totalDistance = 0;
@@ -494,11 +506,13 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
           break;
 
         case 'touch':
-          // We need URL for touch event, but JS might not send it in 'touch' event type
-          // Let's assume the JS injection updates to include url, or we use currentUrlRef
           statsTracker.processTouchEvent(currentUrlRef.current, data.action, data.timestamp);
-          if (data.action === 'move') {
+          if (data.action === 'start') {
+            gatewayRef.current.recordTouchStart();
+          } else if (data.action === 'move') {
             gatewayRef.current.recordTouchMove();
+          } else if (data.action === 'end') {
+            gatewayRef.current.recordTouchEnd();
           }
           break;
 
