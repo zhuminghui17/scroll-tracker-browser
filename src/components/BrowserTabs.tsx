@@ -13,7 +13,11 @@ import { Tab, HistoryEntry, Bookmark } from '../types/browser';
 import { DomainStats } from '../types/tracking';
 import DomainStatsTracker from '../trackers/DomainStatsTracker';
 import BrowserStorage from '../storage/BrowserStorage';
-import { DEFAULT_BOOKMARKS } from '../constants/bookmarks';
+import {
+  DEFAULT_BOOKMARKS,
+  BOOKMARK_DEFAULTS_VERSION,
+  migrateBookmarksIfNeeded,
+} from '../constants/bookmarks';
 import { DeviceConfig } from '../utils/DeviceConfig';
 import { initGatewayConfig } from '../config/gateway';
 
@@ -204,16 +208,23 @@ const BrowserTabs: React.FC = () => {
           previousActiveTabId.current = savedState.activeTabId;
           setActiveTabId(savedState.activeTabId);
           setHistory(savedState.history);
-          // If no bookmarks saved, use default bookmarks
-          setBookmarks(savedState.bookmarks && savedState.bookmarks.length > 0 
-            ? savedState.bookmarks 
-            : DEFAULT_BOOKMARKS);
+          const rawBookmarks = savedState.bookmarks ?? [];
+          const savedVersion = await BrowserStorage.loadBookmarkDefaultsVersion();
+          const nextBookmarks = migrateBookmarksIfNeeded(rawBookmarks, savedVersion);
+          setBookmarks(nextBookmarks);
+          if (savedVersion !== BOOKMARK_DEFAULTS_VERSION) {
+            await BrowserStorage.saveBookmarkDefaultsVersion(BOOKMARK_DEFAULTS_VERSION);
+            await BrowserStorage.saveBookmarks(nextBookmarks);
+            console.log('[BrowserTabs] Migrated bookmarks to defaults version', BOOKMARK_DEFAULTS_VERSION);
+          }
           console.log('[BrowserTabs] Restored browser state from storage');
         } else {
           // Create initial tab and set default bookmarks
           const newTabId = createTab(DEFAULT_URL);
           previousActiveTabId.current = newTabId;
           setBookmarks(DEFAULT_BOOKMARKS);
+          await BrowserStorage.saveBookmarkDefaultsVersion(BOOKMARK_DEFAULTS_VERSION);
+          await BrowserStorage.saveBookmarks(DEFAULT_BOOKMARKS);
           console.log('[BrowserTabs] Created initial tab with default bookmarks');
         }
       } catch (error) {
@@ -221,6 +232,8 @@ const BrowserTabs: React.FC = () => {
         const newTabId = createTab(DEFAULT_URL);
         previousActiveTabId.current = newTabId;
         setBookmarks(DEFAULT_BOOKMARKS);
+        await BrowserStorage.saveBookmarkDefaultsVersion(BOOKMARK_DEFAULTS_VERSION);
+        await BrowserStorage.saveBookmarks(DEFAULT_BOOKMARKS);
       } finally {
         setIsLoading(false);
       }

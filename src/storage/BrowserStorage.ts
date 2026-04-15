@@ -9,6 +9,7 @@ const STORAGE_KEYS = {
   ACTIVE_TAB: '@browser_active_tab',
   HISTORY: '@browser_history',
   BOOKMARKS: '@browser_bookmarks',
+  BOOKMARKS_DEFAULTS_VERSION: '@browser_bookmarks_defaults_version',
   STATS: '@browser_stats',
   SESSION_LOGS: '@browser_session_logs',
   DEVICE_MODEL: '@browser_device_model',
@@ -154,6 +155,26 @@ export class BrowserStorage {
     }
   }
 
+  static async saveBookmarkDefaultsVersion(version: number): Promise<void> {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.BOOKMARKS_DEFAULTS_VERSION, String(version));
+    } catch (error) {
+      console.error('[BrowserStorage] Error saving bookmark defaults version:', error);
+    }
+  }
+
+  static async loadBookmarkDefaultsVersion(): Promise<number | null> {
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_KEYS.BOOKMARKS_DEFAULTS_VERSION);
+      if (raw == null) return null;
+      const n = parseInt(raw, 10);
+      return Number.isFinite(n) ? n : null;
+    } catch (error) {
+      console.error('[BrowserStorage] Error loading bookmark defaults version:', error);
+    }
+    return null;
+  }
+
   // Load bookmarks
   static async loadBookmarks(): Promise<Bookmark[]> {
     try {
@@ -241,6 +262,7 @@ export class BrowserStorage {
         STORAGE_KEYS.ACTIVE_TAB,
         STORAGE_KEYS.HISTORY,
         STORAGE_KEYS.BOOKMARKS,
+        STORAGE_KEYS.BOOKMARKS_DEFAULTS_VERSION,
         STORAGE_KEYS.STATS,
         STORAGE_KEYS.SESSION_LOGS,
         STORAGE_KEYS.DEVICE_MODEL,
