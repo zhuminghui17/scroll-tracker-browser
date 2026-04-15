@@ -10,17 +10,20 @@ import { getGatewayUrlSync, SCROLL_DEBOUNCE_MS } from '../config/gateway';
 import { pixelsToCm, pixelsToMeters } from '../utils/formatters';
 
 const BREAK_SCROLL_METERS = 5;
+const SCROLL_IDLE_MS = 15_000;
 
 class GatewayReporter {
   private pendingDelta = 0;
   private pendingAbsPixels = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private scrollIdleTimer: ReturnType<typeof setTimeout> | null = null;
   private totalDistance = 0;
   private signalCount = 0;
   private scrollTouchCount = 0;
   private startedAt: number | null = null;
   private breakRecommendedEmitted = false;
   onBreakRecommended?: () => void;
+  onScrollIdle?: () => void;
 
   recordTouchMove(): void {
     if (this.startedAt === null) return;
@@ -41,6 +44,33 @@ class GatewayReporter {
     }
     if (!this.timer) {
       this.timer = setTimeout(() => this.flush(), SCROLL_DEBOUNCE_MS);
+    }
+    this.scheduleScrollIdleCheck();
+  }
+
+  private scheduleScrollIdleCheck(): void {
+    if (this.scrollIdleTimer) {
+      clearTimeout(this.scrollIdleTimer);
+      this.scrollIdleTimer = null;
+    }
+    this.scrollIdleTimer = setTimeout(() => {
+      this.scrollIdleTimer = null;
+      if (this.hasActiveSession() && this.onScrollIdle) {
+        this.onScrollIdle();
+      }
+    }, SCROLL_IDLE_MS);
+  }
+
+  /** Restart the idle countdown (e.g. after user dismisses the idle prompt). */
+  resetScrollIdleTimer(): void {
+    if (!this.hasActiveSession()) return;
+    this.scheduleScrollIdleCheck();
+  }
+
+  private clearScrollIdleTimer(): void {
+    if (this.scrollIdleTimer) {
+      clearTimeout(this.scrollIdleTimer);
+      this.scrollIdleTimer = null;
     }
   }
 
@@ -71,6 +101,7 @@ class GatewayReporter {
       clearTimeout(this.timer);
       this.timer = null;
     }
+    this.clearScrollIdleTimer();
     this.flush();
   }
 
@@ -392,10 +423,31 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
       );
     };
 
+    gateway.onScrollIdle = () => {
+      Alert.alert(
+        'Still scrolling?',
+        'You have not scrolled for 15 seconds. End the session to print your receipt, or keep browsing.',
+        [
+          {
+            text: 'Keep browsing',
+            style: 'cancel',
+            onPress: () => gateway.resetScrollIdleTimer(),
+          },
+          {
+            text: 'End session',
+            onPress: () => {
+              void gateway.endSession();
+            },
+          },
+        ],
+      );
+    };
+
     return () => {
       statsTrackerRef.current.pause(currentUrlRef.current, tabId);
       gatewayRef.current.stop();
       gateway.onBreakRecommended = undefined;
+      gateway.onScrollIdle = undefined;
       console.log(`[BrowserView] Tab ${tabId} unmounted, tracking paused`);
     };
   }, [initialUrl, tabId]);
