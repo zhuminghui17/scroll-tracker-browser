@@ -475,7 +475,6 @@ const BrowserTabs: React.FC = () => {
         onNavigate={handleNavigate}
         onShowTabs={handleShowTabs}
         onNewTab={handleNewTab}
-        onShowMenu={handleShowMenu}
         onAddBookmark={handleAddBookmark}
         onShowBookmarks={handleShowBookmarks}
         onShowStats={handleShowStats}
