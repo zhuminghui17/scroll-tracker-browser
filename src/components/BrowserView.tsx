@@ -1,7 +1,7 @@
 // BrowserView: Full-screen WebView with scroll tracking
 
 import React, { useRef, useEffect, useImperativeHandle, forwardRef, useState } from 'react';
-import { StyleSheet, View, Alert } from 'react-native';
+import { StyleSheet, View, Alert, Platform } from 'react-native';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import DomainStatsTracker from '../trackers/DomainStatsTracker';
 import NewTabPage from './NewTabPage';
@@ -11,6 +11,21 @@ import { pixelsToCm, pixelsToMeters } from '../utils/formatters';
 
 const BREAK_SCROLL_METERS = 5;
 const SCROLL_IDLE_MS = 15_000;
+
+/** Without broad entries, react-native-webview sends non-http(s) URLs to Linking.openURL (other apps). */
+const WEBVIEW_ORIGIN_WHITELIST = ['http://*', 'https://*', '*:*'] as const;
+
+function shouldLoadUrlInWebView(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const { protocol } = parsed;
+    if (protocol === 'http:' || protocol === 'https:') return true;
+    if (protocol === 'about:') return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 class GatewayReporter {
   private pendingDelta = 0;
@@ -667,6 +682,8 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
           ref={webViewRef}
           source={{ uri: initialUrl === 'about:newtab' ? 'about:blank' : initialUrl }}
           style={styles.webview}
+          originWhitelist={[...WEBVIEW_ORIGIN_WHITELIST]}
+          onShouldStartLoadWithRequest={(req) => shouldLoadUrlInWebView(req.url)}
           injectedJavaScript={INJECTED_JAVASCRIPT}
           onMessage={handleMessage}
           onNavigationStateChange={handleNavigationStateChange}
@@ -676,6 +693,7 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
           startInLoadingState={true}
           scalesPageToFit={true}
           allowsBackForwardNavigationGestures={true}
+          {...(Platform.OS === 'android' ? { setSupportMultipleWindows: false } : {})}
           // Cache and persistence props
           cacheEnabled={true}
           cacheMode="LOAD_CACHE_ELSE_NETWORK"
