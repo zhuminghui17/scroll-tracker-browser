@@ -4,7 +4,7 @@
   <img src="./assets/icon.png" alt="Logo" width="100"/>
 </p>
 
-Version: 0.0.5
+Version: 0.1.0
 
 A minimal, demo-ready iOS browser (Expo + React Native) that measures how people really browse—recording distance scrolled, active vs passive time, and per-domain sessions in real time.
 
