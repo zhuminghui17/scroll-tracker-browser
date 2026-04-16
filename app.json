@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Scroll Tracker Browser",
+    "name": "Infinite Scroll",
     "slug": "ScrollTrackerBrowser",
     "version": "0.1.0",
     "orientation": "portrait",
