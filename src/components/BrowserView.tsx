@@ -43,12 +43,16 @@ class GatewayReporter {
   }
 
   queue(deltaY: number): void {
+    const d = Number(deltaY);
+    if (!Number.isFinite(d) || d === 0) {
+      return;
+    }
     if (this.startedAt === null) {
       this.startedAt = Date.now();
     }
-    this.totalDistance += Math.abs(deltaY);
-    this.pendingDelta += deltaY;
-    this.pendingAbsPixels += Math.abs(deltaY);
+    this.totalDistance += Math.abs(d);
+    this.pendingDelta += d;
+    this.pendingAbsPixels += Math.abs(d);
     if (
       !this.breakRecommendedEmitted &&
       this.onBreakRecommended &&
@@ -172,11 +176,55 @@ const INJECTED_JAVASCRIPT = `
   
   let lastScrollY = 0;
   let lastTimestamp = Date.now();
-  let isTracking = false;
-  
+
   // Track scrollable containers separately
   let containerScrollPositions = new Map();
   let lastProcessedTime = 0;
+
+  // Shorts/Reels/TikTok-style UIs often swipe with touch and use transforms, so scroll/scrollTop may not move.
+  // Use vertical touch delta when native scroll has not fired recently; clear buffer when native scroll wins.
+  let lastNativeScrollSentAt = 0;
+  const NATIVE_SCROLL_SUPPRESS_TOUCH_MS = 120;
+  let lastTouchY = null;
+  let touchAccumulatedDY = 0;
+  let touchFlushTimer = null;
+
+  function clearTouchScrollBuffer() {
+    touchAccumulatedDY = 0;
+    if (touchFlushTimer) {
+      clearTimeout(touchFlushTimer);
+      touchFlushTimer = null;
+    }
+  }
+
+  function flushTouchScroll() {
+    touchFlushTimer = null;
+    const now = Date.now();
+    if (Math.abs(touchAccumulatedDY) < 2) {
+      touchAccumulatedDY = 0;
+      return;
+    }
+    if (now - lastNativeScrollSentAt < NATIVE_SCROLL_SUPPRESS_TOUCH_MS) {
+      touchAccumulatedDY = 0;
+      return;
+    }
+    const dy = touchAccumulatedDY;
+    touchAccumulatedDY = 0;
+    lastNativeScrollSentAt = now;
+    sendMessage({
+      type: 'scroll',
+      scrollY: window.scrollY || window.pageYOffset || 0,
+      deltaY: dy,
+      timestamp: now,
+      url: window.location.href,
+    });
+  }
+
+  function scheduleTouchFlush() {
+    if (!touchFlushTimer) {
+      touchFlushTimer = setTimeout(flushTouchScroll, 50);
+    }
+  }
 
   // Function to send data to React Native
   function sendMessage(data) {
@@ -221,6 +269,8 @@ const INJECTED_JAVASCRIPT = `
     
     // Only send if there's actual movement (>1px to avoid noise)
     if (Math.abs(deltaY) > 1) {
+      lastNativeScrollSentAt = now;
+      clearTouchScrollBuffer();
       sendMessage({
         type: 'scroll',
         scrollY: scrollY,
@@ -251,22 +301,32 @@ const INJECTED_JAVASCRIPT = `
     }
   }
 
-
-  // Track touch events for more accurate active time tracking
-  function handleTouchStart() {
+  function handleTouchStart(e) {
     sendMessage({
       type: 'touch',
       action: 'start',
       timestamp: Date.now(),
     });
+    if (e.touches && e.touches.length) {
+      lastTouchY = e.touches[0].clientY;
+    }
   }
 
-  function handleTouchMove() {
+  function handleTouchMove(e) {
     sendMessage({
       type: 'touch',
       action: 'move',
       timestamp: Date.now(),
     });
+    if (e.touches && e.touches.length && lastTouchY != null) {
+      const y = e.touches[0].clientY;
+      const dy = lastTouchY - y;
+      lastTouchY = y;
+      if (Math.abs(dy) > 0.5) {
+        touchAccumulatedDY += dy;
+        scheduleTouchFlush();
+      }
+    }
   }
 
   function handleTouchEnd() {
@@ -275,6 +335,22 @@ const INJECTED_JAVASCRIPT = `
       action: 'end',
       timestamp: Date.now(),
     });
+    lastTouchY = null;
+    if (touchFlushTimer) {
+      clearTimeout(touchFlushTimer);
+      touchFlushTimer = null;
+    }
+    flushTouchScroll();
+  }
+
+  function handleTouchCancel() {
+    sendMessage({
+      type: 'touch',
+      action: 'end',
+      timestamp: Date.now(),
+    });
+    lastTouchY = null;
+    clearTouchScrollBuffer();
   }
 
   // Track page load
@@ -307,9 +383,10 @@ const INJECTED_JAVASCRIPT = `
   // Use capture phase to catch scroll events from both window and custom containers
   // The 10ms deduplication in handleScroll prevents double-counting
   document.addEventListener('scroll', throttledScroll, { passive: true, capture: true });
-  window.addEventListener('touchstart', handleTouchStart, { passive: true });
-  window.addEventListener('touchmove', handleTouchMove, { passive: true });
-  window.addEventListener('touchend', handleTouchEnd, { passive: true });
+  document.addEventListener('touchstart', handleTouchStart, { passive: true, capture: true });
+  document.addEventListener('touchmove', handleTouchMove, { passive: true, capture: true });
+  document.addEventListener('touchend', handleTouchEnd, { passive: true, capture: true });
+  document.addEventListener('touchcancel', handleTouchCancel, { passive: true, capture: true });
   
   // Notify that page is loaded
   if (document.readyState === 'complete') {
@@ -462,7 +539,7 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
       gateway.onScrollIdle = undefined;
       console.log(`[BrowserView] Tab ${tabId} unmounted, tracking paused`);
     };
-  }, [initialUrl, tabId]);
+  }, [tabId]);
 
   // Handle navigation from new tab page
   const handleNewTabNavigate = (url: string) => {
@@ -490,20 +567,27 @@ const BrowserView = forwardRef<BrowserViewRef, BrowserViewProps>(function Browse
           console.log('[BrowserView] WebView tracking initialized');
           break;
 
-        case 'scroll':
-          if (Math.random() < 0.05) {
-            console.log(`[BrowserView] Scroll event: deltaY=${data.deltaY}, scrollY=${data.scrollY}`);
+        case 'scroll': {
+          const dy = Number(data.deltaY);
+          if (!Number.isFinite(dy) || dy === 0) {
+            break;
           }
-          
+          const scrollUrl =
+            typeof data.url === 'string' && data.url.length > 0
+              ? data.url
+              : currentUrlRef.current;
+          if (Math.random() < 0.05) {
+            console.log(`[BrowserView] Scroll event: deltaY=${dy}, scrollY=${data.scrollY}`);
+          }
           statsTracker.processScrollEvent(
-            data.url,
+            scrollUrl,
             data.scrollY,
-            data.deltaY,
+            dy,
             data.timestamp
           );
-
-          gatewayRef.current.queue(data.deltaY);
+          gatewayRef.current.queue(dy);
           break;
+        }
 
         case 'touch':
           statsTracker.processTouchEvent(currentUrlRef.current, data.action, data.timestamp);
