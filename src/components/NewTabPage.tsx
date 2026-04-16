@@ -107,7 +107,7 @@ const NewTabPage: React.FC<NewTabPageProps> = ({ onNavigate, bookmarks = [] }) =
 
       {/* Footer */}
       <View style={styles.footer}>
-        <Text style={styles.footerText}>Scroll Tracker Browser</Text>
+        <Text style={styles.footerText}>Infinite Scroll</Text>
       </View>
     </ScrollView>
   );
