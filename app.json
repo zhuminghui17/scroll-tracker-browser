@@ -16,6 +16,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.scrolltracker.browser",
       "infoPlist": {
+        "CFBundleDisplayName": "Infinite Scroll",
         "NSAllowsArbitraryLoads": true,
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
