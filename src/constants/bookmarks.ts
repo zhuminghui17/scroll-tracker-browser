@@ -3,21 +3,21 @@
 import { Bookmark } from '../types/browser';
 
 /** Bump when DEFAULT_BOOKMARKS change so stored bookmarks migrate on next launch. */
-export const BOOKMARK_DEFAULTS_VERSION = 5;
+export const BOOKMARK_DEFAULTS_VERSION = 6;
 
 export const DEFAULT_BOOKMARKS: Bookmark[] = [
-  {
-    id: 'default_tiktok',
-    url: 'https://www.tiktok.com/',
-    title: 'TikTok',
-    domain: 'tiktok.com',
-    timestamp: Date.now(),
-  },
   {
     id: 'default_youtube',
     url: 'https://www.youtube.com/',
     title: 'YouTube',
     domain: 'youtube.com',
+    timestamp: Date.now(),
+  },
+  {
+    id: 'default_threads',
+    url: 'https://www.threads.net/',
+    title: 'Threads',
+    domain: 'threads.net',
     timestamp: Date.now(),
   },
   {
@@ -28,17 +28,17 @@ export const DEFAULT_BOOKMARKS: Bookmark[] = [
     timestamp: Date.now(),
   },
   {
-    id: 'default_twitter_x',
-    url: 'https://x.com/',
-    title: 'Twitter/X',
-    domain: 'x.com',
+    id: 'default_bluesky',
+    url: 'https://bsky.app/',
+    title: 'Bluesky',
+    domain: 'bsky.app',
     timestamp: Date.now(),
   },
   {
-    id: 'default_thedp',
-    url: 'https://www.thedp.com/',
-    title: 'The Daily Pennsylvanian',
-    domain: 'thedp.com',
+    id: 'default_substack',
+    url: 'https://substack.com/',
+    title: 'Substack',
+    domain: 'substack.com',
     timestamp: Date.now(),
   },
   {
